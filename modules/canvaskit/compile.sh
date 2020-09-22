@@ -5,6 +5,34 @@
 # found in the LICENSE file.
 
 set -ex
+EMSDK_VERSION="1.39.16"
+
+#######################################
+# Ensures a repo is checked out.
+# Arguments:
+#   url: string
+#   name: string
+# Returns:
+#   None
+#######################################
+ensure_repo() {
+    local url name
+    local "${@}"
+
+    git -C ${name} pull || git clone ${url} ${name}
+}
+
+ensure_emscripten() {
+    ensure_repo url='https://github.com/emscripten-core/emsdk.git' name='emsdk'
+    pushd 'emsdk'
+        ./emsdk install ${EMSDK_VERSION}
+        ./emsdk activate ${EMSDK_VERSION}
+        source ./emsdk_env.sh
+    popd
+}
+
+ensure_emscripten
+
 
 BASE_DIR=`cd $(dirname ${BASH_SOURCE[0]}) && pwd`
 # This expects the environment variable EMSDK to be set
@@ -25,7 +53,7 @@ EMCC=`which emcc`
 EMCXX=`which em++`
 EMAR=`which emar`
 
-RELEASE_CONF="-Oz --closure 1 --llvm-lto 1 -DSK_RELEASE --pre-js $BASE_DIR/release.js \
+RELEASE_CONF="-Oz --closure 0 -g1 -DSK_RELEASE --pre-js $BASE_DIR/release.js \
               -DGR_GL_CHECK_ALLOC_WITH_GET_ERROR=0"
 EXTRA_CFLAGS="\"-DSK_RELEASE\", \"-DGR_GL_CHECK_ALLOC_WITH_GET_ERROR=0\","
 IS_OFFICIAL_BUILD="true"
@@ -68,7 +96,7 @@ GN_GPU="skia_enable_gpu=true skia_gl_standard = \"webgl\""
 GN_GPU_FLAGS="\"-DSK_DISABLE_LEGACY_SHADERCONTEXT\","
 WASM_GPU="-lEGL -lGLESv2 -DSK_SUPPORT_GPU=1 -DSK_GL \
           -DSK_DISABLE_LEGACY_SHADERCONTEXT --pre-js $BASE_DIR/cpu.js --pre-js $BASE_DIR/gpu.js\
-          -s USE_WEBGL2=1"
+          -s USE_WEBGL2=0"
 if [[ $@ == *cpu* ]]; then
   echo "Using the CPU backend instead of the GPU backend"
   GN_GPU="skia_enable_gpu=false"
@@ -373,6 +401,8 @@ ${EMCXX} \
     $SHAPER_LIB \
     $BUILD_DIR/libskia.a \
     $BUILTIN_FONT \
+    -s ENVIRONMENT='web,worker' \
+    -s USE_CLOSURE_COMPILER=0 \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s EXPORT_NAME="CanvasKitInit" \
     -s FORCE_FILESYSTEM=0 \

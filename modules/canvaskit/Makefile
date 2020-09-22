@@ -1,7 +1,6 @@
 clean:
 	rm -rf ../../out/canvaskit_wasm
 	rm -rf ./canvaskit/bin
-	$(MAKE) release
 
 release:
 	# Does an incremental build where possible.
