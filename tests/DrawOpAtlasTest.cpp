@@ -21,8 +21,8 @@
 #include "include/private/GrTypesPriv.h"
 #include "src/core/SkIPoint16.h"
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
 #include "src/gpu/GrDeferredUpload.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrDrawOpAtlas.h"
 #include "src/gpu/GrDrawingManager.h"
 #include "src/gpu/GrMemoryPool.h"
@@ -98,7 +98,7 @@ public:
         return fTokenTracker.nextDrawToken();
     }
 
-    virtual GrDeferredUploadToken addASAPUpload(GrDeferredTextureUploadFn&& upload) final {
+    GrDeferredUploadToken addASAPUpload(GrDeferredTextureUploadFn&& upload) final {
         return fTokenTracker.nextTokenToFlush();
     }
 
@@ -108,7 +108,7 @@ public:
 private:
     GrTokenTracker fTokenTracker;
 
-    typedef GrDeferredUploadTarget INHERITED;
+    using INHERITED = GrDeferredUploadTarget;
 };
 
 static bool fill_plot(GrDrawOpAtlas* atlas,
@@ -195,7 +195,6 @@ DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrAtlasTextOpPreparation, reporter, ctxInfo) 
 
     auto gpu = context->priv().getGpu();
     auto resourceProvider = context->priv().resourceProvider();
-    auto opMemoryPool = context->priv().opMemoryPool();
 
     auto rtc = GrRenderTargetContext::Make(
             context, GrColorType::kRGBA_8888, nullptr, SkBackingFit::kApprox, {32, 32});
@@ -227,8 +226,8 @@ DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrAtlasTextOpPreparation, reporter, ctxInfo) 
     GrOpFlushState::OpArgs opArgs(op.get(),
                                   &surfaceView,
                                   nullptr,
-                                  GrXferProcessor::DstProxyView(GrSurfaceProxyView(),
-                                                                SkIPoint::Make(0, 0)));
+                                  GrXferProcessor::DstProxyView(),
+                                  GrXferBarrierFlags::kNone);
 
     // Modify the atlas manager so it can't allocate any pages. This will force a failure
     // in the preparation of the text op
@@ -240,7 +239,10 @@ DEF_GPUTEST_FOR_RENDERING_CONTEXTS(GrAtlasTextOpPreparation, reporter, ctxInfo) 
     flushState.setOpArgs(&opArgs);
     op->prepare(&flushState);
     flushState.setOpArgs(nullptr);
-    opMemoryPool->release(std::move(op));
+    #if !defined(GR_OP_ALLOCATE_USE_NEW)
+        auto opMemoryPool = context->priv().opMemoryPool();
+        opMemoryPool->release(std::move(op));
+    #endif
 }
 
 void test_atlas_config(skiatest::Reporter* reporter, int maxTextureSize, size_t maxBytes,

@@ -11,6 +11,7 @@
 #include "include/core/SkPoint3.h"
 #include "include/core/SkTypes.h"
 #include "include/private/SkColorData.h"
+#include "include/private/SkTPin.h"
 #include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkSpecialImage.h"
@@ -142,7 +143,7 @@ protected:
 
 
 private:
-    typedef SkRefCnt INHERITED;
+    using INHERITED = SkRefCnt;
     SkPoint3 fColor;
 };
 
@@ -452,7 +453,7 @@ private:
     sk_sp<SkImageFilterLight> fLight;
     SkScalar fSurfaceScale;
 
-    typedef SkImageFilter_Base INHERITED;
+    using INHERITED = SkImageFilter_Base;
 };
 
 #if SK_SUPPORT_GPU
@@ -568,7 +569,7 @@ private:
     friend class SkLightingImageFilter;
     SkScalar fKD;
 
-    typedef SkLightingImageFilterInternal INHERITED;
+    using INHERITED = SkLightingImageFilterInternal;
 };
 
 class SkSpecularLightingImageFilter : public SkLightingImageFilterInternal {
@@ -604,7 +605,7 @@ private:
     SkScalar fKS;
     SkScalar fShininess;
     friend class SkLightingImageFilter;
-    typedef SkLightingImageFilterInternal INHERITED;
+    using INHERITED = SkLightingImageFilterInternal;
 };
 
 #if SK_SUPPORT_GPU
@@ -636,7 +637,7 @@ private:
     SkMatrix fFilterMatrix;
     BoundaryMode fBoundaryMode;
 
-    typedef GrFragmentProcessor INHERITED;
+    using INHERITED = GrFragmentProcessor;
 };
 
 class GrDiffuseLightingEffect : public GrLightingEffect {
@@ -683,7 +684,7 @@ private:
     GR_DECLARE_FRAGMENT_PROCESSOR_TEST
     SkScalar fKD;
 
-    typedef GrLightingEffect INHERITED;
+    using INHERITED = GrLightingEffect;
 };
 
 class GrSpecularLightingEffect : public GrLightingEffect {
@@ -734,7 +735,7 @@ private:
     SkScalar fKS;
     SkScalar fShininess;
 
-    typedef GrLightingEffect INHERITED;
+    using INHERITED = GrLightingEffect;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -780,7 +781,7 @@ protected:
 private:
     UniformHandle fColorUni;
 
-    typedef SkRefCnt INHERITED;
+    using INHERITED = SkRefCnt;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -793,7 +794,7 @@ public:
                             GrGLSLFPFragmentBuilder*, const char* z) override;
 
 private:
-    typedef GrGLLight INHERITED;
+    using INHERITED = GrGLLight;
     UniformHandle fDirectionUni;
 };
 
@@ -807,7 +808,7 @@ public:
                             GrGLSLFPFragmentBuilder*, const char* z) override;
 
 private:
-    typedef GrGLLight INHERITED;
+    using INHERITED = GrGLLight;
     UniformHandle fLocationUni;
 };
 
@@ -825,7 +826,7 @@ public:
                         const char *surfaceToLight) override;
 
 private:
-    typedef GrGLLight INHERITED;
+    using INHERITED = GrGLLight;
 
     SkString        fLightColorFunc;
     UniformHandle   fLocationUni;
@@ -894,7 +895,7 @@ protected:
 private:
     SkPoint3 fDirection;
 
-    typedef SkImageFilterLight INHERITED;
+    using INHERITED = SkImageFilterLight;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -957,7 +958,7 @@ protected:
 private:
     SkPoint3 fLocation;
 
-    typedef SkImageFilterLight INHERITED;
+    using INHERITED = SkImageFilterLight;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1110,7 +1111,7 @@ private:
     SkScalar fConeScale;
     SkPoint3 fS;
 
-    typedef SkImageFilterLight INHERITED;
+    using INHERITED = SkImageFilterLight;
 };
 
 // According to the spec, the specular term should be in the range [1, 128] :
@@ -1564,7 +1565,7 @@ protected:
                                SkString* funcName) = 0;
 
 private:
-    typedef GrGLSLFragmentProcessor INHERITED;
+    using INHERITED = GrGLSLFragmentProcessor;
 
     UniformHandle              fSurfaceScaleUni;
     GrGLLight*                 fLight;
@@ -1581,7 +1582,7 @@ protected:
     void onSetData(const GrGLSLProgramDataManager&, const GrFragmentProcessor&) override;
 
 private:
-    typedef GrGLLightingEffect INHERITED;
+    using INHERITED = GrGLLightingEffect;
 
     UniformHandle   fKDUni;
 };
@@ -1597,7 +1598,7 @@ protected:
     void onSetData(const GrGLSLProgramDataManager&, const GrFragmentProcessor&) override;
 
 private:
-    typedef GrGLLightingEffect INHERITED;
+    using INHERITED = GrGLLightingEffect;
 
     UniformHandle   fKSUni;
     UniformHandle   fShininessUni;

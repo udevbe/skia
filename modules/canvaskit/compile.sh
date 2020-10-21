@@ -53,7 +53,7 @@ EMCC=`which emcc`
 EMCXX=`which em++`
 EMAR=`which emar`
 
-RELEASE_CONF="-Oz --closure 0 -g1 -DSK_RELEASE --pre-js $BASE_DIR/release.js \
+RELEASE_CONF="-Oz --closure 1 -DSK_RELEASE --pre-js $BASE_DIR/release.js \
               -DGR_GL_CHECK_ALLOC_WITH_GET_ERROR=0"
 EXTRA_CFLAGS="\"-DSK_RELEASE\", \"-DGR_GL_CHECK_ALLOC_WITH_GET_ERROR=0\","
 IS_OFFICIAL_BUILD="true"
@@ -67,7 +67,7 @@ fi
 
 if [[ $@ == *debug* ]]; then
   echo "Building a Debug build"
-  EXTRA_CFLAGS="\"-DSK_DEBUG\""
+  EXTRA_CFLAGS="\"-DSK_DEBUG\","
   RELEASE_CONF="-O0 --js-opts 0 -s DEMANGLE_SUPPORT=1 -s ASSERTIONS=1 -s GL_ASSERTIONS=1 -g4 \
                 --source-map-base /node_modules/canvaskit/bin/ -DSK_DEBUG --pre-js $BASE_DIR/debug.js"
   BUILD_DIR=${BUILD_DIR:="out/canvaskit_wasm_debug"}
@@ -84,7 +84,7 @@ fi
 
 if [[ $@ == *simd* ]]; then
   RELEASE_CONF+=" -msimd128"
-  EXTRA_CFLAGS+=" \"-msimd128\""
+  EXTRA_CFLAGS+="\"-msimd128\","
 fi
 
 mkdir -p $BUILD_DIR
@@ -94,9 +94,9 @@ rm -f $BUILD_DIR/*.a
 
 GN_GPU="skia_enable_gpu=true skia_gl_standard = \"webgl\""
 GN_GPU_FLAGS="\"-DSK_DISABLE_LEGACY_SHADERCONTEXT\","
-WASM_GPU="-lEGL -lGLESv2 -DSK_SUPPORT_GPU=1 -DSK_GL \
+WASM_GPU="-lGL -DSK_SUPPORT_GPU=1 -DSK_GL \
           -DSK_DISABLE_LEGACY_SHADERCONTEXT --pre-js $BASE_DIR/cpu.js --pre-js $BASE_DIR/gpu.js\
-          -s USE_WEBGL2=0"
+          -s USE_WEBGL2=1"
 if [[ $@ == *cpu* ]]; then
   echo "Using the CPU backend instead of the GPU backend"
   GN_GPU="skia_enable_gpu=false"
@@ -225,7 +225,7 @@ else
 fi
 
 if [[ $@ == *no_alias_font* ]]; then
-EXTRA_CFLAGS+=" \"-DCANVASKIT_NO_ALIAS_FONT\""
+EXTRA_CFLAGS+="\"-DCANVASKIT_NO_ALIAS_FONT\","
 FONT_CFLAGS+=" -DCANVASKIT_NO_ALIAS_FONT"
 fi
 
@@ -295,7 +295,6 @@ echo "Compiling bitcode"
   --args="cc=\"${EMCC}\" \
   cxx=\"${EMCXX}\" \
   ar=\"${EMAR}\" \
-  extra_cflags_cc=[\"-frtti\"] \
   extra_cflags=[\"-s\", \"WARN_UNALIGNED=1\", \"-s\", \"MAIN_MODULE=1\",
     \"-DSKNX_NO_SIMD\", \"-DSK_DISABLE_AAA\",
     \"-DSK_FORCE_8_BYTE_ALIGNMENT\",
@@ -311,7 +310,7 @@ echo "Compiling bitcode"
   \
   skia_use_angle=false \
   skia_use_dng_sdk=false \
-  skia_use_egl=true \
+  skia_use_webgl=true \
   skia_use_fontconfig=false \
   skia_use_freetype=true \
   skia_use_libheif=false \
@@ -356,10 +355,18 @@ export EMCC_CLOSURE_ARGS="--externs $BASE_DIR/externs.js "
 
 echo "Generating final wasm"
 
+# Disable '-s STRICT=1' outside of Linux until
+# https://github.com/emscripten-core/emscripten/issues/12118 is resovled.
+STRICTNESS="-s STRICT=1"
+if [[ `uname` != "Linux" ]]; then
+  echo "Disabling '-s STRICT=1'. See: https://github.com/emscripten-core/emscripten/issues/12118"
+  STRICTNESS=""
+fi
+
 # Emscripten prefers that the .a files go last in order, otherwise, it
 # may drop symbols that it incorrectly thinks aren't used. One day,
 # Emscripten will use LLD, which may relax this requirement.
-${EMCXX} \
+EMCC_DEBUG=1 ${EMCXX} \
     $RELEASE_CONF \
     -I. \
     -Ithird_party/icu \
@@ -367,6 +374,8 @@ ${EMCXX} \
     -Ithird_party/externals/icu/source/common/ \
     -DSK_DISABLE_AAA \
     -DSK_FORCE_8_BYTE_ALIGNMENT \
+    -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 \
+    -fno-rtti \
     $WASM_GPU \
     $WASM_PATHOPS \
     $WASM_RT_SHADER \
@@ -401,16 +410,16 @@ ${EMCXX} \
     $SHAPER_LIB \
     $BUILD_DIR/libskia.a \
     $BUILTIN_FONT \
+    -s LLD_REPORT_UNDEFINED \
     -s ENVIRONMENT='web,worker' \
-    -s USE_CLOSURE_COMPILER=0 \
     -s ALLOW_MEMORY_GROWTH=1 \
     -s EXPORT_NAME="CanvasKitInit" \
+    -s EXPORTED_FUNCTIONS=['_malloc','_free'] \
     -s FORCE_FILESYSTEM=0 \
     -s FILESYSTEM=0 \
     -s MODULARIZE=1 \
     -s NO_EXIT_RUNTIME=1 \
-    -s STRICT=1 \
     -s INITIAL_MEMORY=128MB \
-    -s WARN_UNALIGNED=1 \
     -s WASM=1 \
+    $STRICTNESS \
     -o $BUILD_DIR/canvaskit.js

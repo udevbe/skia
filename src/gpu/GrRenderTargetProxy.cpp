@@ -18,7 +18,7 @@
 
 #ifdef SK_DEBUG
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #endif
 
 // Deferred version
@@ -109,7 +109,7 @@ sk_sp<GrSurface> GrRenderTargetProxy::createSurface(GrResourceProvider* resource
     return surface;
 }
 
-size_t GrRenderTargetProxy::onUninstantiatedGpuMemorySize(const GrCaps& caps) const {
+size_t GrRenderTargetProxy::onUninstantiatedGpuMemorySize() const {
     int colorSamplesPerPixel = this->numSamples();
     if (colorSamplesPerPixel > 1) {
         // Add one for the resolve buffer.
@@ -117,7 +117,7 @@ size_t GrRenderTargetProxy::onUninstantiatedGpuMemorySize(const GrCaps& caps) co
     }
 
     // TODO: do we have enough information to improve this worst case estimate?
-    return GrSurface::ComputeSize(caps, this->backendFormat(), this->dimensions(),
+    return GrSurface::ComputeSize(this->backendFormat(), this->dimensions(),
                                   colorSamplesPerPixel, GrMipmapped::kNo, !this->priv().isExact());
 }
 
@@ -166,5 +166,12 @@ void GrRenderTargetProxy::onValidateSurface(const GrSurface* surface) {
     }
     SkASSERT(((int)proxyFlags & kGrInternalRenderTargetFlagsMask) ==
              ((int)surfaceFlags & kGrInternalRenderTargetFlagsMask));
+
+    // We manually check the kVkRTSupportsInputAttachment since we only require it on the surface if
+    // the proxy has it set. If the proxy doesn't have the flag it is legal for the surface to
+    // have the flag.
+    if (proxyFlags & GrInternalSurfaceFlags::kVkRTSupportsInputAttachment) {
+        SkASSERT(surfaceFlags & GrInternalSurfaceFlags::kVkRTSupportsInputAttachment);
+    }
 }
 #endif

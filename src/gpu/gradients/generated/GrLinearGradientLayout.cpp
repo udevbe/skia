@@ -26,9 +26,9 @@ public:
         (void)_outer;
         fragBuilder->codeAppendf(
                 R"SkSL(half t = half(%s.x) + 9.9999997473787516e-06;
-%s = half4(t, 1.0, 0.0, 0.0);
+return half4(t, 1.0, 0.0, 0.0);
 )SkSL",
-                args.fSampleCoord, args.fOutputColor);
+                args.fSampleCoord);
     }
 
 private:
@@ -45,6 +45,7 @@ bool GrLinearGradientLayout::onIsEqual(const GrFragmentProcessor& other) const {
     (void)that;
     return true;
 }
+bool GrLinearGradientLayout::usesExplicitReturn() const { return true; }
 GrLinearGradientLayout::GrLinearGradientLayout(const GrLinearGradientLayout& src)
         : INHERITED(kGrLinearGradientLayout_ClassID, src.optimizationFlags()) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -53,6 +54,9 @@ GrLinearGradientLayout::GrLinearGradientLayout(const GrLinearGradientLayout& src
 std::unique_ptr<GrFragmentProcessor> GrLinearGradientLayout::clone() const {
     return std::make_unique<GrLinearGradientLayout>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrLinearGradientLayout::onDumpInfo() const { return SkString(); }
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrLinearGradientLayout);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrLinearGradientLayout::TestCreate(GrProcessorTestData* d) {

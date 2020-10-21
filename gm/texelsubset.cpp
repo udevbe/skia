@@ -20,7 +20,7 @@
 #include "include/private/GrTypesPriv.h"
 #include "include/private/SkTArray.h"
 #include "src/gpu/GrBitmapTextureMaker.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrProxyProvider.h"
 #include "src/gpu/GrRenderTargetContext.h"
 #include "src/gpu/GrRenderTargetContextPriv.h"
@@ -222,7 +222,7 @@ private:
     MipmapMode fMipmapMode;
     bool fUpscale;
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 DEF_GM(return new TexelSubset(Filter::kNearest, MipmapMode::kNone   , false);)
@@ -235,4 +235,4 @@ DEF_GM(return new TexelSubset(Filter::kLinear , MipmapMode::kNearest, false);)
 DEF_GM(return new TexelSubset(Filter::kNearest, MipmapMode::kLinear , false);)
 DEF_GM(return new TexelSubset(Filter::kLinear , MipmapMode::kLinear , false);)
 
-}
+}  // namespace skiagm

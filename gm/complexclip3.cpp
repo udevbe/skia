@@ -129,7 +129,7 @@ protected:
 private:
     bool fDoSimpleClipFirst;
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -138,4 +138,4 @@ private:
 DEF_GM( return new ComplexClip3GM(true); )
 // Complex clip first
 DEF_GM( return new ComplexClip3GM(false); )
-}
+}  // namespace skiagm

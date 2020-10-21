@@ -47,7 +47,7 @@ using U32 = skvx::Vec<VecWidth, uint32_t>;
 
 static const uint8_t* DisassembleInstruction(const uint8_t* ip) {
     auto inst = READ_INST();
-    printf("%04x ", (int)inst);
+    printf("%02x ", (int)inst);
     switch (inst) {
         DISASSEMBLE_COUNT(kAddF, "addf")
         DISASSEMBLE_COUNT(kAddI, "addi")
@@ -265,7 +265,7 @@ static void CallExternal(const ByteCode* byteCode, const uint8_t*& ip, VValue*& 
     int argumentCount = READ8();
     int returnCount = READ8();
     int target = READ8();
-    ExternalValue* v = byteCode->fExternalValues[target];
+    const ExternalValue* v = byteCode->fExternalValues[target];
     sp -= argumentCount - 1;
 
     float tmpArgs[4];
@@ -432,14 +432,14 @@ static bool InnerRun(const ByteCode* byteCode, const ByteCodeFunction* f, VValue
                 // the stack. Update our bottom of stack to point at the first parameter, and our
                 // sp to point past those parameters (plus space for locals).
                 int target = READ8();
-                const ByteCodeFunction* f = byteCode->fFunctions[target].get();
+                const ByteCodeFunction* fn = byteCode->fFunctions[target].get();
                 if (skvx::any(mask())) {
-                    frames.push_back({ code, ip, stack, f->fParameterCount });
-                    ip = code = f->fCode.data();
-                    stack = sp - f->fParameterCount + 1;
-                    sp = stack + f->fParameterCount + f->fLocalCount - 1;
+                    frames.push_back({ code, ip, stack, fn->fParameterCount });
+                    ip = code = fn->fCode.data();
+                    stack = sp - fn->fParameterCount + 1;
+                    sp = stack + fn->fParameterCount + fn->fLocalCount - 1;
                     // As we did in runStriped(), zero locals so they're safe to mask-store into.
-                    for (int i = f->fParameterCount; i < f->fParameterCount + f->fLocalCount; i++) {
+                    for (int i = fn->fParameterCount; i < fn->fParameterCount + fn->fLocalCount; i++) {
                         stack[i].fFloat = 0.0f;
                     }
                 }
@@ -479,7 +479,7 @@ static bool InnerRun(const ByteCode* byteCode, const ByteCodeFunction* f, VValue
             VECTOR_UNARY_FN(kConvertStoF, skvx::cast<float>, fSigned)
             VECTOR_UNARY_FN(kConvertUtoF, skvx::cast<float>, fUnsigned)
 
-            VECTOR_UNARY_FN(kCos, skvx::cos, fFloat)
+            VECTOR_UNARY_FN(kCos, [](auto x) { return skvx::map(cosf, x); }, fFloat)
 
             VECTOR_BINARY_MASKED_OP(kDivideS, fSigned, /)
             VECTOR_BINARY_MASKED_OP(kDivideU, fUnsigned, /)
@@ -650,7 +650,7 @@ static bool InnerRun(const ByteCode* byteCode, const ByteCodeFunction* f, VValue
                 sp -= READ8();
                 continue;
 
-            VECTOR_BINARY_FN(kPow, fFloat, skvx::pow)
+            VECTOR_BINARY_FN(kPow, fFloat, [](auto x, auto y) { return skvx::map(powf, x,y); })
 
             case ByteCodeInstruction::kPushImmediate:
                 PUSH(U32(READ32()));
@@ -743,7 +743,7 @@ static bool InnerRun(const ByteCode* byteCode, const ByteCodeFunction* f, VValue
                 sp[0] = sp[0].fUnsigned >> READ8();
                 continue;
 
-            VECTOR_UNARY_FN(kSin, skvx::sin, fFloat)
+            VECTOR_UNARY_FN(kSin, [](auto x) { return skvx::map(sinf, x); }, fFloat)
             VECTOR_UNARY_FN(kSqrt, skvx::sqrt, fFloat)
 
             case ByteCodeInstruction::kStore: {
@@ -807,8 +807,8 @@ static bool InnerRun(const ByteCode* byteCode, const ByteCodeFunction* f, VValue
                 }
             } continue;
 
-            VECTOR_UNARY_FN(kATan, skvx::atan, fFloat)
-            VECTOR_UNARY_FN(kTan, skvx::tan, fFloat)
+            VECTOR_UNARY_FN(kATan, [](auto x) { return skvx::map(atanf, x); }, fFloat)
+            VECTOR_UNARY_FN(kTan, [](auto x) { return skvx::map(tanf, x); }, fFloat)
 
             case ByteCodeInstruction::kWriteExternal: {
                 int count = READ8(),

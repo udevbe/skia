@@ -172,7 +172,7 @@ protected:
     }
 
 private:
-    typedef skiagm::GM INHERITED;
+    using INHERITED = skiagm::GM;
 };
 DEF_GM( return new ImageGM; )
 
@@ -295,7 +295,7 @@ protected:
     }
 
 private:
-    typedef skiagm::GM INHERITED;
+    using INHERITED = skiagm::GM;
 };
 DEF_GM( return new ScalePixelsGM; )
 
@@ -437,6 +437,14 @@ static sk_sp<SkImage> serial_deserial(SkImage* img) {
 }
 
 DEF_SIMPLE_GM_CAN_FAIL(image_subset, canvas, errorMsg, 440, 220) {
+    auto rContext = canvas->recordingContext();
+    auto dContext = GrAsDirectContext(rContext);
+
+    if (!dContext && rContext) {
+        *errorMsg = "Not supported in DDL mode";
+        return skiagm::DrawResult::kSkip;
+    }
+
     SkImageInfo info = SkImageInfo::MakeN32Premul(200, 200, nullptr);
     auto        surf = ToolUtils::makeSurface(canvas, info, nullptr);
     auto img = make_lazy_image(surf.get());

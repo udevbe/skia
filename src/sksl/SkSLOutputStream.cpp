@@ -11,7 +11,7 @@
 
 namespace SkSL {
 
-void OutputStream::writeString(String s) {
+void OutputStream::writeString(const String& s) {
     this->write(s.c_str(), s.size());
 }
 
@@ -34,6 +34,7 @@ void OutputStream::appendVAList(const char format[], va_list args) {
     } else {
         this->write(buffer, length);
     }
+    va_end(copy);
 }
 
-}
+}  // namespace SkSL

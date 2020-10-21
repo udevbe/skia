@@ -19,7 +19,7 @@
 #include "include/core/SkTypeface.h"
 #include "include/gpu/GrDirectContext.h"
 #include "src/core/SkGlyphRun.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "tools/fonts/RandomScalerContext.h"
 
 #ifdef SK_BUILD_FOR_WIN
@@ -28,7 +28,7 @@
 
 #include "tests/Test.h"
 
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/text/GrAtlasManager.h"
 #include "src/gpu/text/GrTextBlobCache.h"
 
@@ -67,7 +67,7 @@ static void text_blob_cache_inner(skiatest::Reporter* reporter, GrDirectContext*
                                   bool stressTest) {
     // setup surface
     uint32_t flags = 0;
-    SkSurfaceProps props(flags, SkSurfaceProps::kLegacyFontHost_InitType);
+    SkSurfaceProps props(flags, kRGB_H_SkPixelGeometry);
 
     // configure our context for maximum stressing of cache and atlas
     if (stressTest) {

@@ -24,7 +24,6 @@
 #include "src/sksl/ir/SkSLSwitchStatement.h"
 #include "src/sksl/ir/SkSLSwizzle.h"
 #include "src/sksl/ir/SkSLTernaryExpression.h"
-#include "src/sksl/ir/SkSLVarDeclarationsStatement.h"
 #include "src/sksl/ir/SkSLVariable.h"
 #include "src/sksl/ir/SkSLWhileStatement.h"
 
@@ -101,4 +100,4 @@ std::string SampleUsage::constructor(std::string perspectiveExpression) const {
     return result;
 }
 
-} // namespace
+}  // namespace SkSL

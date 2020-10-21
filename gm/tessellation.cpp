@@ -8,7 +8,7 @@
 #include "gm/gm.h"
 
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrMemoryPool.h"
 #include "src/gpu/GrOpFlushState.h"
 #include "src/gpu/GrOpsRenderPass.h"
@@ -313,7 +313,8 @@ private:
     void onPrePrepare(GrRecordingContext*,
                       const GrSurfaceProxyView* writeView,
                       GrAppliedClip*,
-                      const GrXferProcessor::DstProxyView&) override {}
+                      const GrXferProcessor::DstProxyView&,
+                      GrXferBarrierFlags renderPassXferBarriers) override {}
 
     void onPrepare(GrOpFlushState* flushState) override {
         if (fTriPositions) {
@@ -344,8 +345,9 @@ private:
 
         GrProgramInfo programInfo(state->proxy()->numSamples(), state->proxy()->numStencilSamples(),
                                   state->proxy()->backendFormat(), state->writeView()->origin(),
-                                  &pipeline, shader.get(), GrPrimitiveType::kPatches,
-                                  tessellationPatchVertexCount);
+                                  &pipeline, &GrUserStencilSettings::kUnused, shader.get(),
+                                  GrPrimitiveType::kPatches, tessellationPatchVertexCount,
+                                  state->renderPassBarriers());
 
         state->bindPipeline(programInfo, SkRect::MakeIWH(kWidth, kHeight));
         state->bindBuffers(nullptr, nullptr, std::move(fVertexBuffer));
@@ -413,4 +415,4 @@ DrawResult TessellationGM::onDraw(GrRecordingContext* ctx, GrRenderTargetContext
 
 DEF_GM( return new TessellationGM(); )
 
-}
+}  // namespace skiagm

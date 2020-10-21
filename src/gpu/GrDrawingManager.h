@@ -113,6 +113,9 @@ public:
 
 #if GR_TEST_UTILS
     void testingOnly_removeOnFlushCallbackObject(GrOnFlushCallbackObject*);
+    GrPathRendererChain::Options testingOnly_getOptionsForPathRendererChain() {
+        return fOptionsForPathRendererChain;
+    }
 #endif
 
     GrRenderTask* getLastRenderTask(const GrSurfaceProxy*) const;
@@ -199,8 +202,8 @@ private:
 
     SkDEBUGCODE(void validate() const);
 
-    friend class GrContext; // access to: flush & cleanup
-    friend class GrContextPriv; // access to: flush
+    friend class GrDirectContext; // access to: flush & cleanup
+    friend class GrDirectContextPriv; // access to: flush
     friend class GrOnFlushResourceProvider; // this is just a shallow wrapper around this class
     friend class GrRecordingContext;  // access to: ctor
     friend class SkImage; // for access to: flush

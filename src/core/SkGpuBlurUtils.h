@@ -11,7 +11,7 @@
 #if SK_SUPPORT_GPU
 #include "src/gpu/GrRenderTargetContext.h"
 
-class GrContext;
+class GrRecordingContext;
 class GrTexture;
 
 struct SkRect;
@@ -49,7 +49,7 @@ std::unique_ptr<GrRenderTargetContext> GaussianBlur(GrRecordingContext* context,
                                                     float sigmaY,
                                                     SkTileMode mode,
                                                     SkBackingFit fit = SkBackingFit::kApprox);
-};
+}  // namespace SkGpuBlurUtils
 
 #endif
 #endif

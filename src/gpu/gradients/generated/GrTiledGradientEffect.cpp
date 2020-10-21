@@ -49,7 +49,7 @@ if (!%s && t.y < 0.0) {
                 _sample453.c_str(),
                 (_outer.childProcessor(1)->preservesOpaqueInput() ? "true" : "false"),
                 args.fOutputColor, (_outer.mirror ? "true" : "false"));
-        SkString _coords1451("float2(half2(t.x, 0))");
+        SkString _coords1451("float2(half2(t.x, 0.0))");
         SkString _sample1451 = this->invokeChild(0, args, _coords1451.c_str());
         fragBuilder->codeAppendf(
                 R"SkSL(
@@ -83,6 +83,7 @@ bool GrTiledGradientEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (colorsAreOpaque != that.colorsAreOpaque) return false;
     return true;
 }
+bool GrTiledGradientEffect::usesExplicitReturn() const { return false; }
 GrTiledGradientEffect::GrTiledGradientEffect(const GrTiledGradientEffect& src)
         : INHERITED(kGrTiledGradientEffect_ClassID, src.optimizationFlags())
         , mirror(src.mirror)
@@ -93,3 +94,10 @@ GrTiledGradientEffect::GrTiledGradientEffect(const GrTiledGradientEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrTiledGradientEffect::clone() const {
     return std::make_unique<GrTiledGradientEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrTiledGradientEffect::onDumpInfo() const {
+    return SkStringPrintf("(mirror=%s, makePremul=%s, colorsAreOpaque=%s)",
+                          (mirror ? "true" : "false"), (makePremul ? "true" : "false"),
+                          (colorsAreOpaque ? "true" : "false"));
+}
+#endif

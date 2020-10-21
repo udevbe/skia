@@ -56,6 +56,7 @@ bool GrComposeLerpEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (weight != that.weight) return false;
     return true;
 }
+bool GrComposeLerpEffect::usesExplicitReturn() const { return false; }
 GrComposeLerpEffect::GrComposeLerpEffect(const GrComposeLerpEffect& src)
         : INHERITED(kGrComposeLerpEffect_ClassID, src.optimizationFlags()), weight(src.weight) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -63,3 +64,6 @@ GrComposeLerpEffect::GrComposeLerpEffect(const GrComposeLerpEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrComposeLerpEffect::clone() const {
     return std::make_unique<GrComposeLerpEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrComposeLerpEffect::onDumpInfo() const { return SkStringPrintf("(weight=%f)", weight); }
+#endif

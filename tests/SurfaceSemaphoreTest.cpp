@@ -11,7 +11,7 @@
 #include "include/gpu/GrBackendSurface.h"
 #include "include/gpu/GrDirectContext.h"
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "tests/Test.h"
 #include "tools/gpu/GrContextFactory.h"
 
@@ -72,12 +72,12 @@ void draw_child(skiatest::Reporter* reporter,
     const SkImageInfo childII = SkImageInfo::Make(CHILD_W, CHILD_H, kRGBA_8888_SkColorType,
                                                   kPremul_SkAlphaType);
 
-    auto childCtx = childInfo.directContext();
-    sk_sp<SkSurface> childSurface(SkSurface::MakeRenderTarget(childCtx, SkBudgeted::kNo,
+    auto childDContext = childInfo.directContext();
+    sk_sp<SkSurface> childSurface(SkSurface::MakeRenderTarget(childDContext, SkBudgeted::kNo,
                                                               childII, 0, kTopLeft_GrSurfaceOrigin,
                                                               nullptr));
 
-    sk_sp<SkImage> childImage = SkImage::MakeFromTexture(childCtx,
+    sk_sp<SkImage> childImage = SkImage::MakeFromTexture(childDContext,
                                                          backendTexture,
                                                          kTopLeft_GrSurfaceOrigin,
                                                          kRGBA_8888_SkColorType,

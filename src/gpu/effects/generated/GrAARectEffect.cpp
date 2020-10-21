@@ -40,7 +40,9 @@ half alpha;
         alpha = half(all(greaterThan(float4(sk_FragCoord.xy, %s.zw), float4(%s.xy, sk_FragCoord.xy))) ? 1 : 0);
         break;
     default:
-        half xSub, ySub;
+        half xSub;
+        half ySub;
+
         xSub = min(half(sk_FragCoord.x - %s.x), 0.0);
         xSub += min(half(%s.z - sk_FragCoord.x), 0.0);
         ySub = min(half(sk_FragCoord.y - %s.y), 0.0);
@@ -101,6 +103,7 @@ bool GrAARectEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (rect != that.rect) return false;
     return true;
 }
+bool GrAARectEffect::usesExplicitReturn() const { return false; }
 GrAARectEffect::GrAARectEffect(const GrAARectEffect& src)
         : INHERITED(kGrAARectEffect_ClassID, src.optimizationFlags())
         , edgeType(src.edgeType)
@@ -110,6 +113,12 @@ GrAARectEffect::GrAARectEffect(const GrAARectEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrAARectEffect::clone() const {
     return std::make_unique<GrAARectEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrAARectEffect::onDumpInfo() const {
+    return SkStringPrintf("(edgeType=%d, rect=float4(%f, %f, %f, %f))", (int)edgeType, rect.left(),
+                          rect.top(), rect.right(), rect.bottom());
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrAARectEffect);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrAARectEffect::TestCreate(GrProcessorTestData* d) {

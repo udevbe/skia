@@ -35,10 +35,9 @@ public:
                                                   "end");
         fragBuilder->codeAppendf(
                 R"SkSL(half t = half(%s.x);
-%s = mix(%s, %s, t);
+return mix(%s, %s, t);
 )SkSL",
-                args.fSampleCoord, args.fOutputColor,
-                args.fUniformHandler->getUniformCStr(startVar),
+                args.fSampleCoord, args.fUniformHandler->getUniformCStr(startVar),
                 args.fUniformHandler->getUniformCStr(endVar));
     }
 
@@ -77,6 +76,7 @@ bool GrSingleIntervalGradientColorizer::onIsEqual(const GrFragmentProcessor& oth
     if (end != that.end) return false;
     return true;
 }
+bool GrSingleIntervalGradientColorizer::usesExplicitReturn() const { return true; }
 GrSingleIntervalGradientColorizer::GrSingleIntervalGradientColorizer(
         const GrSingleIntervalGradientColorizer& src)
         : INHERITED(kGrSingleIntervalGradientColorizer_ClassID, src.optimizationFlags())
@@ -88,3 +88,9 @@ GrSingleIntervalGradientColorizer::GrSingleIntervalGradientColorizer(
 std::unique_ptr<GrFragmentProcessor> GrSingleIntervalGradientColorizer::clone() const {
     return std::make_unique<GrSingleIntervalGradientColorizer>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrSingleIntervalGradientColorizer::onDumpInfo() const {
+    return SkStringPrintf("(start=half4(%f, %f, %f, %f), end=half4(%f, %f, %f, %f))", start.fR,
+                          start.fG, start.fB, start.fA, end.fR, end.fG, end.fB, end.fA);
+}
+#endif

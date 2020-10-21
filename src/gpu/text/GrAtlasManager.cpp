@@ -179,7 +179,9 @@ GrDrawOpAtlas::ErrorCode GrAtlasManager::addGlyphToAtlas(const SkGlyph& skGlyph,
                                       storage.get(),
                                       &grGlyph->fAtlasLocator);
 
-    grGlyph->fAtlasLocator.insetSrc(srcPadding);
+    if (errorCode == GrDrawOpAtlas::ErrorCode::kSucceeded) {
+        grGlyph->fAtlasLocator.insetSrc(srcPadding);
+    }
 
     return errorCode;
 }
@@ -205,7 +207,7 @@ void GrAtlasManager::addGlyphToBulkAndSetUseToken(GrDrawOpAtlas::BulkUseTokenUpd
 
 #ifdef SK_DEBUG
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrSurfaceContext.h"
 #include "src/gpu/GrSurfaceProxy.h"
 #include "src/gpu/GrTextureProxy.h"
@@ -219,27 +221,26 @@ void GrAtlasManager::addGlyphToBulkAndSetUseToken(GrDrawOpAtlas::BulkUseTokenUpd
   * Write the contents of the surface proxy to a PNG. Returns true if successful.
   * @param filename      Full path to desired file
   */
-static bool save_pixels(GrDirectContext* context, GrSurfaceProxyView view, GrColorType colorType,
+static bool save_pixels(GrDirectContext* dContext, GrSurfaceProxyView view, GrColorType colorType,
                         const char* filename) {
     if (!view.proxy()) {
         return false;
     }
 
-    SkImageInfo ii =
-            SkImageInfo::Make(view.proxy()->dimensions(), kRGBA_8888_SkColorType,
-                              kPremul_SkAlphaType);
+    auto ii = SkImageInfo::Make(view.proxy()->dimensions(), kRGBA_8888_SkColorType,
+                                kPremul_SkAlphaType);
     SkBitmap bm;
     if (!bm.tryAllocPixels(ii)) {
         return false;
     }
 
-    auto sContext = GrSurfaceContext::Make(context, std::move(view), colorType,
+    auto sContext = GrSurfaceContext::Make(dContext, std::move(view), colorType,
                                            kUnknown_SkAlphaType, nullptr);
     if (!sContext || !sContext->asTextureProxy()) {
         return false;
     }
 
-    bool result = sContext->readPixels(ii, bm.getPixels(), bm.rowBytes(), {0, 0});
+    bool result = sContext->readPixels(dContext, ii, bm.getPixels(), bm.rowBytes(), {0, 0});
     if (!result) {
         SkDebugf("------ failed to read pixels for %s\n", filename);
         return false;
@@ -307,11 +308,10 @@ bool GrAtlasManager::initAtlas(GrMaskFormat format) {
         const GrBackendFormat format = fCaps->getDefaultBackendFormat(grColorType,
                                                                       GrRenderable::kNo);
 
-        fAtlases[index] = GrDrawOpAtlas::Make(
-                fProxyProvider, format, grColorType,
-                atlasDimensions.width(), atlasDimensions.height(),
-                plotDimensions.width(), plotDimensions.height(),
-                this, fAllowMultitexturing, nullptr);
+        fAtlases[index] = GrDrawOpAtlas::Make(fProxyProvider, format, grColorType,
+                                              atlasDimensions.width(), atlasDimensions.height(),
+                                              plotDimensions.width(), plotDimensions.height(),
+                                              this, fAllowMultitexturing, nullptr);
         if (!fAtlases[index]) {
             return false;
         }

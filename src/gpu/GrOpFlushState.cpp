@@ -9,8 +9,8 @@
 
 #include "include/gpu/GrDirectContext.h"
 #include "src/core/SkConvertPixels.h"
-#include "src/gpu/GrContextPriv.h"
 #include "src/gpu/GrDataUtils.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrDrawOpAtlas.h"
 #include "src/gpu/GrGpu.h"
 #include "src/gpu/GrImageInfo.h"
@@ -35,7 +35,8 @@ const GrCaps& GrOpFlushState::caps() const {
 }
 
 void GrOpFlushState::executeDrawsAndUploadsForMeshDrawOp(
-        const GrOp* op, const SkRect& chainBounds, const GrPipeline* pipeline) {
+        const GrOp* op, const SkRect& chainBounds, const GrPipeline* pipeline,
+        const GrUserStencilSettings* userStencilSettings) {
     SkASSERT(this->opsRenderPass());
 
     while (fCurrDraw != fDraws.end() && fCurrDraw->fOp == op) {
@@ -51,8 +52,11 @@ void GrOpFlushState::executeDrawsAndUploadsForMeshDrawOp(
                                   this->proxy()->backendFormat(),
                                   this->writeView()->origin(),
                                   pipeline,
+                                  userStencilSettings,
                                   fCurrDraw->fGeometryProcessor,
-                                  fCurrDraw->fPrimitiveType);
+                                  fCurrDraw->fPrimitiveType,
+                                  0,
+                                  this->renderPassBarriers());
 
         this->bindPipelineAndScissorClip(programInfo, chainBounds);
         this->bindTextures(programInfo.primProc(), fCurrDraw->fPrimProcProxies,
@@ -204,6 +208,10 @@ GrStrikeCache* GrOpFlushState::strikeCache() const {
 
 GrAtlasManager* GrOpFlushState::atlasManager() const {
     return fGpu->getContext()->priv().getAtlasManager();
+}
+
+GrSmallPathAtlasMgr* GrOpFlushState::smallPathAtlasManager() const {
+    return fGpu->getContext()->priv().getSmallPathAtlasMgr();
 }
 
 void GrOpFlushState::drawMesh(const GrSimpleMesh& mesh) {

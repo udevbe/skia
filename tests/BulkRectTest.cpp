@@ -7,7 +7,7 @@
 
 #include "include/gpu/GrDirectContext.h"
 #include "src/core/SkBlendModePriv.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrProxyProvider.h"
 #include "src/gpu/GrRenderTargetContext.h"
 #include "src/gpu/GrRenderTargetContextPriv.h"
@@ -20,7 +20,7 @@ static std::unique_ptr<GrRenderTargetContext> new_RTC(GrRecordingContext* rConte
             rContext, GrColorType::kRGBA_8888, nullptr, SkBackingFit::kExact, {128, 128});
 }
 
-sk_sp<GrSurfaceProxy> create_proxy(GrRecordingContext* rContext) {
+static sk_sp<GrSurfaceProxy> create_proxy(GrRecordingContext* rContext) {
     static constexpr SkISize kDimensions = {128, 128};
 
     const GrBackendFormat format = rContext->priv().caps()->getDefaultBackendFormat(

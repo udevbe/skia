@@ -31,7 +31,7 @@
 #include "include/gpu/GrDirectContext.h"
 #include "include/gpu/GrTypes.h"
 #include "src/core/SkAutoPixmapStorage.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrGpu.h"
 #include "src/gpu/gl/GrGLCaps.h"
 #include "src/gpu/gl/GrGLDefines.h"
@@ -257,9 +257,9 @@ private:
     sk_sp<SkImage> fGradImgs[kNumGradImages];
     sk_sp<SkImage> fSmallImg;
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 DEF_GM(return new RectangleTexture;)
-}
+}  // namespace skiagm
 #endif

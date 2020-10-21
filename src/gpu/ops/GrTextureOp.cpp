@@ -249,13 +249,17 @@ public:
                                           sk_sp<GrColorSpaceXform> textureColorSpaceXform) {
         // Allocate size based on proxyRunCnt, since that determines number of ViewCountPairs.
         SkASSERT(proxyRunCnt <= cnt);
-
         size_t size = sizeof(TextureOp) + sizeof(ViewCountPair) * (proxyRunCnt - 1);
-        GrOpMemoryPool* pool = context->priv().opMemoryPool();
-        void* mem = pool->allocate(size);
+        #if defined(GR_OP_ALLOCATE_USE_NEW)
+            void* mem = ::operator new(size);
+        #else
+            GrOpMemoryPool* pool = context->priv().opMemoryPool();
+            void* mem = pool->allocate(size);
+        #endif
         return std::unique_ptr<GrDrawOp>(
-                new (mem) TextureOp(set, cnt, proxyRunCnt, filter, mm, saturate, aaType, constraint,
-                                    viewMatrix, std::move(textureColorSpaceXform)));
+                new (mem) TextureOp(
+                        set, cnt, proxyRunCnt, filter, mm, saturate, aaType, constraint,
+                        viewMatrix, std::move(textureColorSpaceXform)));
     }
 
     ~TextureOp() override {
@@ -277,38 +281,6 @@ public:
     }
 
 #ifdef SK_DEBUG
-    SkString dumpInfo() const override {
-        SkString str;
-        str.appendf("# draws: %d\n", fQuads.count());
-        auto iter = fQuads.iterator();
-        for (unsigned p = 0; p < fMetadata.fProxyCount; ++p) {
-            str.appendf("Proxy ID: %d, Filter: %d, MM: %d\n",
-                        fViewCountPairs[p].fProxy->uniqueID().asUInt(),
-                        static_cast<int>(fMetadata.fFilter),
-                        static_cast<int>(fMetadata.fMipmapMode));
-            int i = 0;
-            while(i < fViewCountPairs[p].fQuadCnt && iter.next()) {
-                const GrQuad* quad = iter.deviceQuad();
-                GrQuad uv = iter.isLocalValid() ? *(iter.localQuad()) : GrQuad();
-                const ColorSubsetAndAA& info = iter.metadata();
-                str.appendf(
-                        "%d: Color: 0x%08x, Subset(%d): [L: %.2f, T: %.2f, R: %.2f, B: %.2f]\n"
-                        "  UVs  [(%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)]\n"
-                        "  Quad [(%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)]\n",
-                        i, info.fColor.toBytes_RGBA(), fMetadata.fSubset, info.fSubsetRect.fLeft,
-                        info.fSubsetRect.fTop, info.fSubsetRect.fRight, info.fSubsetRect.fBottom,
-                        quad->point(0).fX, quad->point(0).fY, quad->point(1).fX, quad->point(1).fY,
-                        quad->point(2).fX, quad->point(2).fY, quad->point(3).fX, quad->point(3).fY,
-                        uv.point(0).fX, uv.point(0).fY, uv.point(1).fX, uv.point(1).fY,
-                        uv.point(2).fX, uv.point(2).fY, uv.point(3).fX, uv.point(3).fY);
-
-                i++;
-            }
-        }
-        str += INHERITED::dumpInfo();
-        return str;
-    }
-
     static void ValidateResourceLimits() {
         // The op implementation has an upper bound on the number of quads that it can represent.
         // However, the resource manager imposes its own limit on the number of quads, which should
@@ -683,7 +655,8 @@ private:
                              SkArenaAlloc* arena,
                              const GrSurfaceProxyView* writeView,
                              GrAppliedClip&& appliedClip,
-                             const GrXferProcessor::DstProxyView& dstProxyView) override {
+                             const GrXferProcessor::DstProxyView& dstProxyView,
+                             GrXferBarrierFlags renderPassXferBarriers) override {
         SkASSERT(fDesc);
 
         GrGeometryProcessor* gp;
@@ -708,13 +681,14 @@ private:
         fDesc->fProgramInfo = GrSimpleMeshDrawOpHelper::CreateProgramInfo(
                 caps, arena, writeView, std::move(appliedClip), dstProxyView, gp,
                 GrProcessorSet::MakeEmptySet(), fDesc->fVertexSpec.primitiveType(),
-                pipelineFlags);
+                renderPassXferBarriers, pipelineFlags);
     }
 
     void onPrePrepareDraws(GrRecordingContext* context,
                            const GrSurfaceProxyView* writeView,
                            GrAppliedClip* clip,
-                           const GrXferProcessor::DstProxyView& dstProxyView) override {
+                           const GrXferProcessor::DstProxyView& dstProxyView,
+                           GrXferBarrierFlags renderPassXferBarriers) override {
         TRACE_EVENT0("skia.gpu", TRACE_FUNC);
 
         SkDEBUGCODE(this->validate();)
@@ -728,7 +702,8 @@ private:
         FillInVertices(*context->priv().caps(), this, fDesc, fDesc->fPrePreparedVertices);
 
         // This will call onCreateProgramInfo and register the created program with the DDL.
-        this->INHERITED::onPrePrepareDraws(context, writeView, clip, dstProxyView);
+        this->INHERITED::onPrePrepareDraws(context, writeView, clip, dstProxyView,
+                                           renderPassXferBarriers);
     }
 
     static void FillInVertices(const GrCaps& caps, TextureOp* texOp, Desc* desc, char* vertexData) {
@@ -993,7 +968,7 @@ private:
     CombineResult onCombineIfPossible(GrOp* t, GrRecordingContext::Arenas*,
                                       const GrCaps& caps) override {
         TRACE_EVENT0("skia.gpu", TRACE_FUNC);
-        const auto* that = t->cast<TextureOp>();
+        auto* that = t->cast<TextureOp>();
 
         SkDEBUGCODE(this->validate();)
         SkDEBUGCODE(that->validate();)
@@ -1070,13 +1045,55 @@ private:
         fMetadata.fTotalQuadCount += that->fQuads.count();
 
         if (upgradeToCoverageAAOnMerge) {
+            // This merger may be the start of a concatenation of two chains. When one
+            // of the chains mutates its AA the other must follow suit or else the above AA
+            // check may prevent later ops from chaining together. A specific example of this is
+            // when chain2 is prepended onto chain1:
+            //  chain1 (that): opA (non-AA/mergeable) opB (non-AA/non-mergeable)
+            //  chain2 (this): opC (cov-AA/non-mergeable) opD (cov-AA/mergeable)
+            // W/o this propagation, after opD & opA merge, opB and opC would say they couldn't
+            // chain - which would stop the concatenation process.
             this->propagateCoverageAAThroughoutChain();
+            that->propagateCoverageAAThroughoutChain();
         }
 
         SkDEBUGCODE(this->validate();)
 
         return CombineResult::kMerged;
     }
+
+#if GR_TEST_UTILS
+    SkString onDumpInfo() const override {
+        SkString str = SkStringPrintf("# draws: %d\n", fQuads.count());
+        auto iter = fQuads.iterator();
+        for (unsigned p = 0; p < fMetadata.fProxyCount; ++p) {
+            str.appendf("Proxy ID: %d, Filter: %d, MM: %d\n",
+                        fViewCountPairs[p].fProxy->uniqueID().asUInt(),
+                        static_cast<int>(fMetadata.fFilter),
+                        static_cast<int>(fMetadata.fMipmapMode));
+            int i = 0;
+            while(i < fViewCountPairs[p].fQuadCnt && iter.next()) {
+                const GrQuad* quad = iter.deviceQuad();
+                GrQuad uv = iter.isLocalValid() ? *(iter.localQuad()) : GrQuad();
+                const ColorSubsetAndAA& info = iter.metadata();
+                str.appendf(
+                        "%d: Color: 0x%08x, Subset(%d): [L: %.2f, T: %.2f, R: %.2f, B: %.2f]\n"
+                        "  UVs  [(%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)]\n"
+                        "  Quad [(%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f), (%.2f, %.2f)]\n",
+                        i, info.fColor.toBytes_RGBA(), fMetadata.fSubset, info.fSubsetRect.fLeft,
+                        info.fSubsetRect.fTop, info.fSubsetRect.fRight, info.fSubsetRect.fBottom,
+                        quad->point(0).fX, quad->point(0).fY, quad->point(1).fX, quad->point(1).fY,
+                        quad->point(2).fX, quad->point(2).fY, quad->point(3).fX, quad->point(3).fY,
+                        uv.point(0).fX, uv.point(0).fY, uv.point(1).fX, uv.point(1).fY,
+                        uv.point(2).fX, uv.point(2).fY, uv.point(3).fX, uv.point(3).fY);
+
+                i++;
+            }
+        }
+        return str;
+    }
+#endif
+
     GrQuadBuffer<ColorSubsetAndAA> fQuads;
     sk_sp<GrColorSpaceXform> fTextureColorSpaceXform;
     // Most state of TextureOp is packed into these two field to minimize the op's size.
@@ -1090,7 +1107,7 @@ private:
     // as an fProxyCnt-length array.
     ViewCountPair fViewCountPairs[1];
 
-    typedef GrMeshDrawOp INHERITED;
+    using INHERITED = GrMeshDrawOp;
 };
 
 }  // anonymous namespace

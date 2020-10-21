@@ -9,7 +9,9 @@
 
 #include <memory>
 
+#include "include/private/SkTPin.h"
 #include "src/core/SkOpts.h"
+#include "src/gpu/GrBackendUtils.h"
 #include "src/gpu/GrOnFlushResourceProvider.h"
 #include "src/gpu/GrOpFlushState.h"
 #include "src/gpu/GrProxyProvider.h"
@@ -23,24 +25,16 @@
 static bool gDumpAtlasData = false;
 #endif
 
-std::array<uint16_t, 4> GrDrawOpAtlas::AtlasLocator::getUVs() const {
-
-    // We pack the 2bit page index in the low bit of the u and v texture coords
-    uint32_t pageIndex = this->pageIndex();
-    auto [left, top] = PackIndexInTexCoords(fRect.fLeft, fRect.fTop, pageIndex);
-    auto [right, bottom] = PackIndexInTexCoords(fRect.fRight, fRect.fBottom, pageIndex);
-    return { left, top, right, bottom };
-}
-
 #ifdef SK_DEBUG
-void GrDrawOpAtlas::AtlasLocator::validate(const GrDrawOpAtlas* drawOpAtlas) const {
+void GrDrawOpAtlas::validate(const AtlasLocator& atlasLocator) const {
     // Verify that the plotIndex stored in the PlotLocator is consistent with the glyph rectangle
-    int numPlotsX = drawOpAtlas->fTextureWidth / drawOpAtlas->fPlotWidth;
-    int numPlotsY = drawOpAtlas->fTextureHeight / drawOpAtlas->fPlotHeight;
+    int numPlotsX = fTextureWidth / fPlotWidth;
+    int numPlotsY = fTextureHeight / fPlotHeight;
 
-    int plotIndex = this->plotIndex();
-    int plotX = fRect.fLeft / drawOpAtlas->fPlotWidth;
-    int plotY = fRect.fTop / drawOpAtlas->fPlotHeight;
+    int plotIndex = atlasLocator.plotIndex();
+    auto topLeft = atlasLocator.topLeft();
+    int plotX = topLeft.x() / fPlotWidth;
+    int plotY = topLeft.y() / fPlotHeight;
     SkASSERT(plotIndex == (numPlotsY - plotY - 1) * numPlotsX + (numPlotsX - plotX - 1));
 }
 #endif
@@ -85,32 +79,6 @@ std::unique_ptr<GrDrawOpAtlas> GrDrawOpAtlas::Make(GrProxyProvider* proxyProvide
     return atlas;
 }
 
-// The two bits that make up the texture index are packed into the lower bits of the u and v
-// coordinate respectively.
-std::pair<uint16_t, uint16_t> GrDrawOpAtlas::PackIndexInTexCoords(uint16_t u, uint16_t v,
-                                                                  int pageIndex) {
-    SkASSERT(pageIndex >= 0 && pageIndex < 4);
-    uint16_t uBit = (pageIndex >> 1u) & 0x1u;
-    uint16_t vBit = pageIndex & 0x1u;
-    u <<= 1u;
-    u |= uBit;
-    v <<= 1u;
-    v |= vBit;
-    return std::make_pair(u, v);
-}
-
-std::tuple<uint16_t, uint16_t, int> GrDrawOpAtlas::UnpackIndexFromTexCoords(uint16_t u,
-                                                                            uint16_t v) {
-    int pageIndex = 0;
-    if (u & 0x1) {
-        pageIndex |= 0x2;
-    }
-    if (v & 0x1) {
-        pageIndex |= 0x1;
-    }
-    return std::make_tuple(u >> 1, v >> 1, pageIndex);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 GrDrawOpAtlas::Plot::Plot(int pageIndex, int plotIndex, GenerationCounter* generationCounter,
         int offX, int offY, int width, int height, GrColorType colorType)
@@ -146,7 +114,8 @@ GrDrawOpAtlas::Plot::~Plot() {
     sk_free(fData);
 }
 
-bool GrDrawOpAtlas::Plot::addSubImage(int width, int height, const void* image, GrIRect16* rect) {
+bool GrDrawOpAtlas::Plot::addSubImage(
+        int width, int height, const void* image, AtlasLocator* atlasLocator) {
     SkASSERT(width <= fWidth && height <= fHeight);
 
     SkIPoint16 loc;
@@ -154,18 +123,18 @@ bool GrDrawOpAtlas::Plot::addSubImage(int width, int height, const void* image, 
         return false;
     }
 
-    *rect = GrIRect16::MakeXYWH(loc.fX, loc.fY, width, height);
+    GrIRect16 rect = GrIRect16::MakeXYWH(loc.fX, loc.fY, width, height);
 
     if (!fData) {
-        fData = reinterpret_cast<unsigned char*>(sk_calloc_throw(fBytesPerPixel * fWidth *
-                                                                 fHeight));
+        fData = reinterpret_cast<unsigned char*>(
+                sk_calloc_throw(fBytesPerPixel * fWidth * fHeight));
     }
     size_t rowBytes = width * fBytesPerPixel;
     const unsigned char* imagePtr = (const unsigned char*)image;
     // point ourselves at the right starting spot
     unsigned char* dataPtr = fData;
-    dataPtr += fBytesPerPixel * fWidth * rect->fTop;
-    dataPtr += fBytesPerPixel * rect->fLeft;
+    dataPtr += fBytesPerPixel * fWidth * rect.fTop;
+    dataPtr += fBytesPerPixel * rect.fLeft;
     // copy into the data buffer, swizzling as we go if this is ARGB data
     if (4 == fBytesPerPixel && kN32_SkColorType == kBGRA_8888_SkColorType) {
         for (int i = 0; i < height; ++i) {
@@ -181,9 +150,10 @@ bool GrDrawOpAtlas::Plot::addSubImage(int width, int height, const void* image, 
         }
     }
 
-    fDirtyRect.join({rect->fLeft, rect->fTop, rect->fRight, rect->fBottom});
+    fDirtyRect.join({rect.fLeft, rect.fTop, rect.fRight, rect.fBottom});
 
-    rect->offset(fOffset.fX, fOffset.fY);
+    rect.offset(fOffset.fX, fOffset.fY);
+    atlasLocator->updateRect(rect);
     SkDEBUGCODE(fDirty = true;)
 
     return true;
@@ -231,10 +201,10 @@ void GrDrawOpAtlas::Plot::resetRects() {
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GrDrawOpAtlas::GrDrawOpAtlas(
-        GrProxyProvider* proxyProvider, const GrBackendFormat& format,
-        GrColorType colorType, int width, int height, int plotWidth, int plotHeight,
-        GenerationCounter* generationCounter, AllowMultitexturing allowMultitexturing)
+GrDrawOpAtlas::GrDrawOpAtlas(GrProxyProvider* proxyProvider, const GrBackendFormat& format,
+                             GrColorType colorType, int width, int height,
+                             int plotWidth, int plotHeight, GenerationCounter* generationCounter,
+                             AllowMultitexturing allowMultitexturing)
         : fFormat(format)
         , fColorType(colorType)
         , fTextureWidth(width)
@@ -287,14 +257,13 @@ inline bool GrDrawOpAtlas::updatePlot(GrDeferredUploadTarget* target,
                 });
         plot->setLastUploadToken(lastUploadToken);
     }
-    atlasLocator->fPlotLocator = plot->plotLocator();
-    SkDEBUGCODE(atlasLocator->validate(this);)
+    atlasLocator->updatePlotLocator(plot->plotLocator());
+    SkDEBUGCODE(this->validate(*atlasLocator);)
     return true;
 }
 
-bool GrDrawOpAtlas::uploadToPage(const GrCaps& caps, unsigned int pageIdx,
-                                 GrDeferredUploadTarget* target, int width, int height,
-                                 const void* image, AtlasLocator* atlasLocator) {
+bool GrDrawOpAtlas::uploadToPage(unsigned int pageIdx, GrDeferredUploadTarget* target, int width,
+                                 int height, const void* image, AtlasLocator* atlasLocator) {
     SkASSERT(fViews[pageIdx].proxy() && fViews[pageIdx].proxy()->isInstantiated());
 
     // look through all allocated plots for one we can share, in Most Recently Refed order
@@ -302,9 +271,10 @@ bool GrDrawOpAtlas::uploadToPage(const GrCaps& caps, unsigned int pageIdx,
     plotIter.init(fPages[pageIdx].fPlotList, PlotList::Iter::kHead_IterStart);
 
     for (Plot* plot = plotIter.get(); plot; plot = plotIter.next()) {
-        SkASSERT(caps.bytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) == plot->bpp());
+        SkASSERT(GrBackendFormatBytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) ==
+                 plot->bpp());
 
-        if (plot->addSubImage(width, height, image, &atlasLocator->fRect)) {
+        if (plot->addSubImage(width, height, image, atlasLocator)) {
             return this->updatePlot(target, atlasLocator, plot);
         }
     }
@@ -329,13 +299,11 @@ GrDrawOpAtlas::ErrorCode GrDrawOpAtlas::addToAtlas(GrResourceProvider* resourceP
         return ErrorCode::kError;
     }
 
-    const GrCaps& caps = *resourceProvider->caps();
-
     // Look through each page to see if we can upload without having to flush
     // We prioritize this upload to the first pages, not the most recently used, to make it easier
     // to remove unused pages in reverse page order.
     for (unsigned int pageIdx = 0; pageIdx < fNumActivePages; ++pageIdx) {
-        if (this->uploadToPage(caps, pageIdx, target, width, height, image, atlasLocator)) {
+        if (this->uploadToPage(pageIdx, target, width, height, image, atlasLocator)) {
             return ErrorCode::kSucceeded;
         }
     }
@@ -351,10 +319,9 @@ GrDrawOpAtlas::ErrorCode GrDrawOpAtlas::addToAtlas(GrResourceProvider* resourceP
             SkASSERT(plot);
             if (plot->lastUseToken() < target->tokenTracker()->nextTokenToFlush()) {
                 this->processEvictionAndResetRects(plot);
-                SkASSERT(caps.bytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) ==
+                SkASSERT(GrBackendFormatBytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) ==
                          plot->bpp());
-                SkDEBUGCODE(bool verify = )plot->addSubImage(width, height, image,
-                                                             &atlasLocator->fRect);
+                SkDEBUGCODE(bool verify = )plot->addSubImage(width, height, image, atlasLocator);
                 SkASSERT(verify);
                 if (!this->updatePlot(target, atlasLocator, plot)) {
                     return ErrorCode::kError;
@@ -368,8 +335,7 @@ GrDrawOpAtlas::ErrorCode GrDrawOpAtlas::addToAtlas(GrResourceProvider* resourceP
             return ErrorCode::kError;
         }
 
-        if (this->uploadToPage(caps, fNumActivePages-1, target, width, height, image,
-                               atlasLocator)) {
+        if (this->uploadToPage(fNumActivePages-1, target, width, height, image, atlasLocator)) {
             return ErrorCode::kSucceeded;
         } else {
             // If we fail to upload to a newly activated page then something has gone terribly
@@ -409,8 +375,9 @@ GrDrawOpAtlas::ErrorCode GrDrawOpAtlas::addToAtlas(GrResourceProvider* resourceP
     newPlot.reset(plot->clone());
 
     fPages[pageIdx].fPlotList.addToHead(newPlot.get());
-    SkASSERT(caps.bytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) == newPlot->bpp());
-    SkDEBUGCODE(bool verify = )newPlot->addSubImage(width, height, image, &atlasLocator->fRect);
+    SkASSERT(GrBackendFormatBytesPerPixel(fViews[pageIdx].proxy()->backendFormat()) ==
+             newPlot->bpp());
+    SkDEBUGCODE(bool verify = )newPlot->addSubImage(width, height, image, atlasLocator);
     SkASSERT(verify);
 
     // Note that this plot will be uploaded inline with the draws whereas the
@@ -427,8 +394,8 @@ GrDrawOpAtlas::ErrorCode GrDrawOpAtlas::addToAtlas(GrResourceProvider* resourceP
             });
     newPlot->setLastUploadToken(lastUploadToken);
 
-    atlasLocator->fPlotLocator = newPlot->plotLocator();
-    SkDEBUGCODE(atlasLocator->validate(this);)
+    atlasLocator->updatePlotLocator(newPlot->plotLocator());
+    SkDEBUGCODE(this->validate(*atlasLocator);)
 
     return ErrorCode::kSucceeded;
 }

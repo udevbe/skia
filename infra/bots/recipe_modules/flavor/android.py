@@ -357,7 +357,7 @@ if actual_freq != str(freq):
   def install(self):
     self._adb('mkdir ' + self.device_dirs.resource_dir,
               'shell', 'mkdir', '-p', self.device_dirs.resource_dir)
-    if self.m.vars.builder_cfg.get('model') == 'GalaxyS20':
+    if self.m.vars.builder_cfg.get('model') in ['GalaxyS20', 'GalaxyS9']:
       # See skia:10184, should be moot once upgraded to Android 11?
       self._adb('cp libGLES_mali.so to ' + self.device_dirs.bin_dir,
                  'shell', 'cp',
@@ -517,6 +517,21 @@ time.sleep(60)
             self.device_dirs.bin_dir))
     self._adb('push %s' % sh,
               'push', self.m.vars.tmp_dir.join(sh), self.device_dirs.bin_dir)
+
+    self.m.python.inline('debugging', """
+    import subprocess
+    def run(*cmd):
+      print('====================================')
+      print(' '.join(cmd))
+      print('====================================')
+      subprocess.call(cmd)
+    adb = '%s'
+    run('uptime')
+    run(adb, 'shell', 'uptime')
+    run(adb, 'shell', 'ps')
+    run(adb, 'logcat', '-d')
+    """ % self.ADB_BINARY,
+      args=[self.device_dirs.bin_dir, sh])
 
     self._adb('clear log', 'logcat', '-c')
     self.m.python.inline('%s' % cmd[0], """

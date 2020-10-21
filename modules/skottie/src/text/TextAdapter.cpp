@@ -9,6 +9,7 @@
 
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkM44.h"
+#include "include/private/SkTPin.h"
 #include "modules/skottie/src/SkottieJson.h"
 #include "modules/skottie/src/text/RangeSelector.h"
 #include "modules/skottie/src/text/TextAnimator.h"
@@ -269,10 +270,12 @@ void TextAdapter::reshape() {
         fText->fTypeface,
         fText->fTextSize,
         fText->fLineHeight,
+        fText->fLineShift,
         fText->fAscent,
         fText->fHAlign,
         fText->fVAlign,
         fText->fResize,
+        fText->fLineBreak,
         this->shaperFlags(),
     };
     const auto shape_result = Shaper::Shape(fText->fText, text_desc, fText->fBox, fFontMgr);
@@ -315,9 +318,9 @@ void TextAdapter::reshape() {
     bounds_color->setStrokeWidth(1);
     bounds_color->setAntiAlias(true);
 
-    fRoot->addChild(sksg::Draw::Make(sksg::Rect::Make(fText.fBox),
+    fRoot->addChild(sksg::Draw::Make(sksg::Rect::Make(fText->fBox),
                                      std::move(box_color)));
-    fRoot->addChild(sksg::Draw::Make(sksg::Rect::Make(shape_result.computeBounds()),
+    fRoot->addChild(sksg::Draw::Make(sksg::Rect::Make(shape_result.computeVisualBounds()),
                                      std::move(bounds_color)));
 #endif
 }

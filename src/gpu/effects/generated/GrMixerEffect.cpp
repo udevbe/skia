@@ -62,6 +62,7 @@ bool GrMixerEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (weight != that.weight) return false;
     return true;
 }
+bool GrMixerEffect::usesExplicitReturn() const { return false; }
 GrMixerEffect::GrMixerEffect(const GrMixerEffect& src)
         : INHERITED(kGrMixerEffect_ClassID, src.optimizationFlags()), weight(src.weight) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -69,3 +70,6 @@ GrMixerEffect::GrMixerEffect(const GrMixerEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrMixerEffect::clone() const {
     return std::make_unique<GrMixerEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrMixerEffect::onDumpInfo() const { return SkStringPrintf("(weight=%f)", weight); }
+#endif

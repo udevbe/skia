@@ -317,7 +317,7 @@ bool SkPictureData::parseStreamTag(SkStream* stream,
                 } else {
                     tf = SkTypeface::MakeDeserialize(stream);
                 }
-                if (!tf.get()) {    // failed to deserialize
+                if (!tf) {    // failed to deserialize
                     // fTFPlayback asserts it never has a null, so we plop in
                     // the default here.
                     tf = SkTypeface::MakeDefault();
@@ -327,7 +327,7 @@ bool SkPictureData::parseStreamTag(SkStream* stream,
         } break;
         case SK_PICT_PICTURE_TAG: {
             SkASSERT(fPictures.empty());
-            fPictures.reserve(SkToInt(size));
+            fPictures.reserve_back(SkToInt(size));
 
             for (uint32_t i = 0; i < size; i++) {
                 auto pic = SkPicture::MakeFromStream(stream, &procs, topLevelTFPlayback);
@@ -530,4 +530,22 @@ bool SkPictureData::parseBuffer(SkReadBuffer& buffer) {
         return false;
     }
     return true;
+}
+
+const SkPaint* SkPictureData::optionalPaint(SkReadBuffer* reader) const {
+    int index = reader->readInt();
+    if (index == 0) {
+        return nullptr; // recorder wrote a zero for no paint (likely drawimage)
+    }
+    return reader->validate(index > 0 && index <= fPaints.count()) ?
+        &fPaints[index - 1] : nullptr;
+}
+
+const SkPaint& SkPictureData::requiredPaint(SkReadBuffer* reader) const {
+    const SkPaint* paint = this->optionalPaint(reader);
+    if (reader->validate(paint != nullptr)) {
+        return *paint;
+    }
+    static const SkPaint& stub = *(new SkPaint);
+    return stub;
 }

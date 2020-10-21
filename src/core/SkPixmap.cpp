@@ -15,6 +15,7 @@
 #include "include/private/SkHalf.h"
 #include "include/private/SkImageInfoPriv.h"
 #include "include/private/SkNx.h"
+#include "include/private/SkTPin.h"
 #include "include/private/SkTemplates.h"
 #include "include/private/SkTo.h"
 #include "src/core/SkConvertPixels.h"
@@ -567,7 +568,7 @@ static bool draw_orientation(const SkPixmap& dst, const SkPixmap& src, SkEncoded
     SkBitmap bm;
     bm.installPixels(src);
 
-    SkMatrix m = SkEncodedOriginToMatrix(origin, src.width(), src.height());
+    SkMatrix m = SkEncodedOriginToMatrix(origin, dst.width(), dst.height());
 
     SkPaint p;
     p.setBlendMode(SkBlendMode::kSrc);

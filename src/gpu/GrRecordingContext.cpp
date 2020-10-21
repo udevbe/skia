@@ -64,13 +64,6 @@ void GrRecordingContext::setupDrawingManager(bool sortOpsTasks, bool reduceOpsTa
         prcOptions.fGpuPathRenderers &= ~GpuPathRenderers::kSmall;
     }
 
-    if (!this->proxyProvider()->renderingDirectly()) {
-        // DDL TODO: remove this crippling of the path renderer chain
-        // Disable the small path renderer bc of the proxies in the atlas. They need to be
-        // unified when the opsTasks are added back to the destination drawing manager.
-        prcOptions.fGpuPathRenderers &= ~GpuPathRenderers::kSmall;
-    }
-
     fDrawingManager.reset(new GrDrawingManager(this,
                                                prcOptions,
                                                sortOpsTasks,
@@ -138,8 +131,29 @@ const GrTextBlobCache* GrRecordingContext::getTextBlobCache() const {
     return fThreadSafeProxy->priv().getTextBlobCache();
 }
 
+GrThreadSafeCache* GrRecordingContext::threadSafeCache() {
+    return fThreadSafeProxy->priv().threadSafeCache();
+}
+
+const GrThreadSafeCache* GrRecordingContext::threadSafeCache() const {
+    return fThreadSafeProxy->priv().threadSafeCache();
+}
+
 void GrRecordingContext::addOnFlushCallbackObject(GrOnFlushCallbackObject* onFlushCBObject) {
     this->drawingManager()->addOnFlushCallbackObject(onFlushCBObject);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+int GrRecordingContext::maxTextureSize() const { return this->caps()->maxTextureSize(); }
+
+int GrRecordingContext::maxRenderTargetSize() const { return this->caps()->maxRenderTargetSize(); }
+
+bool GrRecordingContext::colorTypeSupportedAsImage(SkColorType colorType) const {
+    GrBackendFormat format =
+            this->caps()->getDefaultBackendFormat(SkColorTypeToGrColorType(colorType),
+                                                  GrRenderable::kNo);
+    return format.isValid();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,10 +163,6 @@ sk_sp<const GrCaps> GrRecordingContextPriv::refCaps() const {
 
 void GrRecordingContextPriv::addOnFlushCallbackObject(GrOnFlushCallbackObject* onFlushCBObject) {
     fContext->addOnFlushCallbackObject(onFlushCBObject);
-}
-
-GrContext* GrRecordingContextPriv::backdoor() {
-    return (GrContext*) fContext;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

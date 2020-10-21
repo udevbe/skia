@@ -43,12 +43,12 @@ public:
         fragBuilder->codeAppendf(
                 R"SkSL(half4 inputColor = %s;
 @if (%s) {
-    half4 _inlineResulthalf4unpremulhalf40;
-    half4 _inlineArghalf4unpremulhalf41_0 = inputColor;
+    half4 _0_unpremul;
     {
-        _inlineResulthalf4unpremulhalf40 = half4(_inlineArghalf4unpremulhalf41_0.xyz / max(_inlineArghalf4unpremulhalf41_0.w, 9.9999997473787516e-05), _inlineArghalf4unpremulhalf41_0.w);
+        _0_unpremul = half4(inputColor.xyz / max(inputColor.w, 9.9999997473787516e-05), inputColor.w);
     }
-    inputColor = _inlineResulthalf4unpremulhalf40;
+
+    inputColor = _0_unpremul;
 
 }
 %s = %s * inputColor + %s;
@@ -77,6 +77,7 @@ private:
             const SkM44& mValue = _outer.m;
             if (mPrev != (mValue)) {
                 mPrev = mValue;
+                static_assert(1 == 1);
                 pdman.setSkM44(mVar, mValue);
             }
             const SkV4& vValue = _outer.v;
@@ -110,6 +111,7 @@ bool GrColorMatrixFragmentProcessor::onIsEqual(const GrFragmentProcessor& other)
     if (premulOutput != that.premulOutput) return false;
     return true;
 }
+bool GrColorMatrixFragmentProcessor::usesExplicitReturn() const { return false; }
 GrColorMatrixFragmentProcessor::GrColorMatrixFragmentProcessor(
         const GrColorMatrixFragmentProcessor& src)
         : INHERITED(kGrColorMatrixFragmentProcessor_ClassID, src.optimizationFlags())
@@ -123,6 +125,17 @@ GrColorMatrixFragmentProcessor::GrColorMatrixFragmentProcessor(
 std::unique_ptr<GrFragmentProcessor> GrColorMatrixFragmentProcessor::clone() const {
     return std::make_unique<GrColorMatrixFragmentProcessor>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrColorMatrixFragmentProcessor::onDumpInfo() const {
+    return SkStringPrintf(
+            "(m=half4x4(%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f), "
+            "v=half4(%f, %f, %f, %f), unpremulInput=%s, clampRGBOutput=%s, premulOutput=%s)",
+            m.rc(0, 0), m.rc(1, 0), m.rc(2, 0), m.rc(3, 0), m.rc(0, 1), m.rc(1, 1), m.rc(2, 1),
+            m.rc(3, 1), m.rc(0, 2), m.rc(1, 2), m.rc(2, 2), m.rc(3, 2), m.rc(0, 3), m.rc(1, 3),
+            m.rc(2, 3), m.rc(3, 3), v.x, v.y, v.z, v.w, (unpremulInput ? "true" : "false"),
+            (clampRGBOutput ? "true" : "false"), (premulOutput ? "true" : "false"));
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrColorMatrixFragmentProcessor);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrColorMatrixFragmentProcessor::TestCreate(

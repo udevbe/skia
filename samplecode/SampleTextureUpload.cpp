@@ -32,7 +32,7 @@ class TextureUploadSample : public Sample {
     class RenderTargetTexture : public SkRefCnt {
     public:
         RenderTargetTexture(GrDirectContext* direct, int size) {
-            SkSurfaceProps surfaceProps(SkSurfaceProps::kLegacyFontHost_InitType);
+            SkSurfaceProps surfaceProps(0, kRGB_H_SkPixelGeometry);
             SkImageInfo imageInfo = SkImageInfo::Make(size, size, kRGBA_8888_SkColorType,
                                                       kPremul_SkAlphaType);
             fSurface = SkSurface::MakeRenderTarget(direct, SkBudgeted::kNo, imageInfo, 0,
@@ -150,8 +150,6 @@ class TextureUploadSample : public Sample {
     }
 };
 
-const int TextureUploadSample::kMinTileSize;
-const int TextureUploadSample::kMaxTileSize;
 
 DEF_SAMPLE( return new TextureUploadSample(); )
 

@@ -111,6 +111,7 @@ bool GrCircleEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (radius != that.radius) return false;
     return true;
 }
+bool GrCircleEffect::usesExplicitReturn() const { return false; }
 GrCircleEffect::GrCircleEffect(const GrCircleEffect& src)
         : INHERITED(kGrCircleEffect_ClassID, src.optimizationFlags())
         , edgeType(src.edgeType)
@@ -121,6 +122,12 @@ GrCircleEffect::GrCircleEffect(const GrCircleEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrCircleEffect::clone() const {
     return std::make_unique<GrCircleEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrCircleEffect::onDumpInfo() const {
+    return SkStringPrintf("(edgeType=%d, center=float2(%f, %f), radius=%f)", (int)edgeType,
+                          center.fX, center.fY, radius);
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrCircleEffect);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrCircleEffect::TestCreate(GrProcessorTestData* testData) {

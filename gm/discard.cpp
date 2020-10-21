@@ -21,7 +21,6 @@
 #include "include/utils/SkRandom.h"
 #include "tools/ToolUtils.h"
 
-class GrContext;
 class GrRenderTargetContext;
 
 namespace skiagm {
@@ -92,11 +91,11 @@ protected:
     }
 
 private:
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_GM(return new DiscardGM;)
 
-} // end namespace
+}  // namespace skiagm

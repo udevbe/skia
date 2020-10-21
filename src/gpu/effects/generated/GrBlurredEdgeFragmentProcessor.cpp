@@ -61,6 +61,7 @@ bool GrBlurredEdgeFragmentProcessor::onIsEqual(const GrFragmentProcessor& other)
     if (mode != that.mode) return false;
     return true;
 }
+bool GrBlurredEdgeFragmentProcessor::usesExplicitReturn() const { return false; }
 GrBlurredEdgeFragmentProcessor::GrBlurredEdgeFragmentProcessor(
         const GrBlurredEdgeFragmentProcessor& src)
         : INHERITED(kGrBlurredEdgeFragmentProcessor_ClassID, src.optimizationFlags())
@@ -70,3 +71,8 @@ GrBlurredEdgeFragmentProcessor::GrBlurredEdgeFragmentProcessor(
 std::unique_ptr<GrFragmentProcessor> GrBlurredEdgeFragmentProcessor::clone() const {
     return std::make_unique<GrBlurredEdgeFragmentProcessor>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrBlurredEdgeFragmentProcessor::onDumpInfo() const {
+    return SkStringPrintf("(mode=%d)", (int)mode);
+}
+#endif

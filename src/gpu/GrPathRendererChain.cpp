@@ -11,11 +11,12 @@
 #include "include/gpu/GrDirectContext.h"
 #include "include/gpu/GrRecordingContext.h"
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrGpu.h"
 #include "src/gpu/GrRecordingContextPriv.h"
 #include "src/gpu/GrShaderCaps.h"
 #include "src/gpu/ccpr/GrCoverageCountingPathRenderer.h"
+#include "src/gpu/geometry/GrStyledShape.h"
 #include "src/gpu/ops/GrAAConvexPathRenderer.h"
 #include "src/gpu/ops/GrAAHairLinePathRenderer.h"
 #include "src/gpu/ops/GrAALinearizingConvexPathRenderer.h"
@@ -33,7 +34,7 @@ GrPathRendererChain::GrPathRendererChain(GrRecordingContext* context, const Opti
     }
     if (options.fGpuPathRenderers & GpuPathRenderers::kTessellation) {
         if (GrTessellationPathRenderer::IsSupported(caps)) {
-            auto tess = sk_make_sp<GrTessellationPathRenderer>(caps);
+            auto tess = sk_make_sp<GrTessellationPathRenderer>(context);
             context->priv().addOnFlushCallbackObject(tess.get());
             fChain.push_back(std::move(tess));
         }
@@ -58,9 +59,7 @@ GrPathRendererChain::GrPathRendererChain(GrRecordingContext* context, const Opti
         fChain.push_back(sk_make_sp<GrAALinearizingConvexPathRenderer>());
     }
     if (options.fGpuPathRenderers & GpuPathRenderers::kSmall) {
-        auto spr = sk_make_sp<GrSmallPathRenderer>();
-        context->priv().addOnFlushCallbackObject(spr.get());
-        fChain.push_back(std::move(spr));
+        fChain.push_back(sk_make_sp<GrSmallPathRenderer>());
     }
     if (options.fGpuPathRenderers & GpuPathRenderers::kStencilAndCover) {
         auto direct = context->asDirectContext();

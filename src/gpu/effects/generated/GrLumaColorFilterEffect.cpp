@@ -27,7 +27,7 @@ public:
         SkString _sample870 = this->invokeChild(0, args);
         fragBuilder->codeAppendf(
                 R"SkSL(half4 inputColor = %s;
-
+;
 half luma = clamp(dot(half3(0.2125999927520752, 0.71520000696182251, 0.072200000286102295), inputColor.xyz), 0.0, 1.0);
 %s = half4(0.0, 0.0, 0.0, luma);
 )SkSL",
@@ -48,6 +48,7 @@ bool GrLumaColorFilterEffect::onIsEqual(const GrFragmentProcessor& other) const 
     (void)that;
     return true;
 }
+bool GrLumaColorFilterEffect::usesExplicitReturn() const { return false; }
 GrLumaColorFilterEffect::GrLumaColorFilterEffect(const GrLumaColorFilterEffect& src)
         : INHERITED(kGrLumaColorFilterEffect_ClassID, src.optimizationFlags()) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -55,3 +56,6 @@ GrLumaColorFilterEffect::GrLumaColorFilterEffect(const GrLumaColorFilterEffect& 
 std::unique_ptr<GrFragmentProcessor> GrLumaColorFilterEffect::clone() const {
     return std::make_unique<GrLumaColorFilterEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrLumaColorFilterEffect::onDumpInfo() const { return SkString(); }
+#endif

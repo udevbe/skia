@@ -49,10 +49,7 @@ static uint32_t sampler_key(GrTextureType textureType, const GrSwizzle& swizzle,
     int samplerTypeKey = texture_type_key(textureType);
 
     static_assert(2 == sizeof(swizzle.asKey()));
-    uint16_t swizzleKey = 0;
-    if (caps.shaderCaps()->textureSwizzleAppliedInShader()) {
-        swizzleKey = swizzle.asKey();
-    }
+    uint16_t swizzleKey = swizzle.asKey();
     return SkToU32(samplerTypeKey | swizzleKey << kSamplerOrImageTypeKeyBits);
 }
 
@@ -215,7 +212,7 @@ bool GrProgramDesc::Build(GrProgramDesc* desc,
         origin = pipeline.dstProxyView().origin();
         originIfDstTexture = &origin;
     }
-    xp.getGLSLProcessorKey(*caps.shaderCaps(), &b, originIfDstTexture);
+    xp.getGLSLProcessorKey(*caps.shaderCaps(), &b, originIfDstTexture, pipeline.dstSampleType());
     if (!gen_xp_meta_key(xp, &b)) {
         desc->key().reset();
         return false;

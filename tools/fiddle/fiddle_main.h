@@ -13,7 +13,7 @@
     #include "include/core/SkPictureRecorder.h"
     #include "include/core/SkStream.h"
     #include "include/core/SkSurface.h"
-    #include "include/gpu/GrContext.h"
+    #include "include/gpu/GrDirectContext.h"
     #include "include/gpu/gl/GrGLAssembleInterface.h"
     #include "include/gpu/gl/GrGLInterface.h"
 #else
@@ -33,7 +33,7 @@ extern double frame;    // A value in [0, 1] of where we are in the animation.
 
 namespace sk_gpu_test {
 class GLTestContext;
-}
+}  // namespace sk_gpu_test
 
 struct DrawOptions {
     DrawOptions(int w, int h, bool r, bool g, bool p, bool k, bool srgb, bool f16,

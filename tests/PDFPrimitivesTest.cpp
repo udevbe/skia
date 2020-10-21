@@ -275,7 +275,7 @@ private:
 
     mutable bool fVisited;
 
-    typedef SkImageFilter_Base INHERITED;
+    using INHERITED = SkImageFilter_Base;
 };
 
 sk_sp<SkFlattenable> DummyImageFilter::CreateProc(SkReadBuffer& buffer) {
@@ -284,7 +284,7 @@ sk_sp<SkFlattenable> DummyImageFilter::CreateProc(SkReadBuffer& buffer) {
     return DummyImageFilter::Make(visited);
 }
 
-};
+}  // namespace
 
 // Check that PDF rendering of image filters successfully falls back to
 // CPU rasterization.

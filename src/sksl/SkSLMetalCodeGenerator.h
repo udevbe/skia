@@ -29,6 +29,7 @@
 #include "src/sksl/ir/SkSLFunctionDefinition.h"
 #include "src/sksl/ir/SkSLIfStatement.h"
 #include "src/sksl/ir/SkSLIndexExpression.h"
+#include "src/sksl/ir/SkSLInlineMarker.h"
 #include "src/sksl/ir/SkSLIntLiteral.h"
 #include "src/sksl/ir/SkSLInterfaceBlock.h"
 #include "src/sksl/ir/SkSLPostfixExpression.h"
@@ -41,7 +42,6 @@
 #include "src/sksl/ir/SkSLSwizzle.h"
 #include "src/sksl/ir/SkSLTernaryExpression.h"
 #include "src/sksl/ir/SkSLVarDeclarations.h"
-#include "src/sksl/ir/SkSLVarDeclarationsStatement.h"
 #include "src/sksl/ir/SkSLVariableReference.h"
 #include "src/sksl/ir/SkSLWhileStatement.h"
 
@@ -176,7 +176,7 @@ protected:
 
     void writeName(const String& name);
 
-    void writeVarDeclarations(const VarDeclarations& decl, bool global);
+    void writeVarDeclaration(const VarDeclaration& decl, bool global);
 
     void writeFragCoord();
 
@@ -194,6 +194,8 @@ protected:
 
     bool matrixConstructHelperIsNeeded(const Constructor& c);
     String getMatrixConstructHelper(const Constructor& c);
+    void assembleMatrixFromMatrix(const Type& sourceMatrix, int rows, int columns);
+    void assembleMatrixFromExpressions(const ExpressionArray& args, int rows, int columns);
 
     void writeMatrixTimesEqualHelper(const Type& left, const Type& right, const Type& result);
 
@@ -229,7 +231,7 @@ protected:
 
     void writeStatement(const Statement& s);
 
-    void writeStatements(const std::vector<std::unique_ptr<Statement>>& statements);
+    void writeStatements(const StatementArray& statements);
 
     void writeBlock(const Block& b);
 
@@ -283,9 +285,9 @@ protected:
     int fUniformBuffer = -1;
     String fRTHeightName;
 
-    typedef CodeGenerator INHERITED;
+    using INHERITED = CodeGenerator;
 };
 
-}
+}  // namespace SkSL
 
 #endif

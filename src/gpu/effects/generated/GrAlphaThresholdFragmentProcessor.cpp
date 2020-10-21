@@ -86,6 +86,7 @@ bool GrAlphaThresholdFragmentProcessor::onIsEqual(const GrFragmentProcessor& oth
     if (outerThreshold != that.outerThreshold) return false;
     return true;
 }
+bool GrAlphaThresholdFragmentProcessor::usesExplicitReturn() const { return false; }
 GrAlphaThresholdFragmentProcessor::GrAlphaThresholdFragmentProcessor(
         const GrAlphaThresholdFragmentProcessor& src)
         : INHERITED(kGrAlphaThresholdFragmentProcessor_ClassID, src.optimizationFlags())
@@ -96,6 +97,11 @@ GrAlphaThresholdFragmentProcessor::GrAlphaThresholdFragmentProcessor(
 std::unique_ptr<GrFragmentProcessor> GrAlphaThresholdFragmentProcessor::clone() const {
     return std::make_unique<GrAlphaThresholdFragmentProcessor>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrAlphaThresholdFragmentProcessor::onDumpInfo() const {
+    return SkStringPrintf("(innerThreshold=%f, outerThreshold=%f)", innerThreshold, outerThreshold);
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrAlphaThresholdFragmentProcessor);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrAlphaThresholdFragmentProcessor::TestCreate(

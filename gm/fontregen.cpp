@@ -33,7 +33,7 @@
 #include "include/gpu/GrRecordingContext.h"
 #include "include/private/GrTypesPriv.h"
 #include "include/private/SkTemplates.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "tools/ToolUtils.h"
 
 class GrRenderTargetContext;
@@ -110,7 +110,7 @@ private:
     static constexpr int kSize = 512;
 
     sk_sp<SkTextBlob> fBlobs[3];
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////
@@ -154,7 +154,7 @@ private:
     static constexpr int kSize = 512;
 
     sk_sp<SkTextBlob> fBlobs[3];
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////

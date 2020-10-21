@@ -22,7 +22,7 @@
 #include "include/gpu/gl/GrGLTypes.h"
 #include "src/core/SkMessageBus.h"
 #include "src/gpu/GrAHardwareBufferUtils.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrProxyProvider.h"
 #include "src/gpu/GrRecordingContextPriv.h"
 #include "src/gpu/GrResourceCache.h"
@@ -178,9 +178,9 @@ GrSurfaceProxyView GrAHardwareBufferImageGenerator::makeView(GrRecordingContext*
 
                 return tex;
             },
-            backendFormat, {width, height}, GrRenderable::kNo, 1, GrMipmapped::kNo,
-            GrMipmapStatus::kNotAllocated, GrInternalSurfaceFlags::kReadOnly, SkBackingFit::kExact,
-            SkBudgeted::kNo, GrProtected(fIsProtectedContent), GrSurfaceProxy::UseAllocator::kYes);
+            backendFormat, {width, height}, GrMipmapped::kNo, GrMipmapStatus::kNotAllocated,
+            GrInternalSurfaceFlags::kReadOnly, SkBackingFit::kExact, SkBudgeted::kNo,
+            GrProtected(fIsProtectedContent), GrSurfaceProxy::UseAllocator::kYes);
 
     GrSwizzle readSwizzle = context->priv().caps()->getReadSwizzle(backendFormat, grColorType);
 

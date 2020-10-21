@@ -17,8 +17,8 @@
 #include "src/core/SkTTopoSort.h"
 #include "src/gpu/GrAuditTrail.h"
 #include "src/gpu/GrClientMappedBufferManager.h"
-#include "src/gpu/GrContextPriv.h"
 #include "src/gpu/GrCopyRenderTask.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrGpu.h"
 #include "src/gpu/GrMemoryPool.h"
 #include "src/gpu/GrOnFlushResourceProvider.h"
@@ -289,13 +289,13 @@ bool GrDrawingManager::flush(
 
 #if 0
     // Enable this to print out verbose GrOp information
-    SkDEBUGCODE(SkDebugf("onFlush renderTasks:"));
+    SkDEBUGCODE(SkDebugf("onFlush renderTasks (%d):\n", fOnFlushRenderTasks.count()));
     for (const auto& onFlushRenderTask : fOnFlushRenderTasks) {
-        SkDEBUGCODE(onFlushRenderTask->dump();)
+        SkDEBUGCODE(onFlushRenderTask->dump(/* printDependencies */ true);)
     }
-    SkDEBUGCODE(SkDebugf("Normal renderTasks:"));
-    for (int i = 0; i < fRenderTasks.count(); ++i) {
-        SkDEBUGCODE(fRenderTasks[i]->dump();)
+    SkDEBUGCODE(SkDebugf("Normal renderTasks (%d):\n", fDAG.numRenderTasks()));
+    for (int i = 0; i < fDAG.numRenderTasks(); ++i) {
+        SkDEBUGCODE(fDAG.renderTask(i)->dump(/* printDependencies */ true);)
     }
 #endif
 

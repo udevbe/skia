@@ -57,6 +57,8 @@ public:
 
     GrTextBlobCache* getTextBlobCache() { return fContext->getTextBlobCache(); }
 
+    GrThreadSafeCache* threadSafeCache() { return fContext->threadSafeCache(); }
+
     void moveRenderTasksToDDL(SkDeferredDisplayList*);
 
     /**
@@ -68,10 +70,6 @@ public:
     void addOnFlushCallbackObject(GrOnFlushCallbackObject*);
 
     GrAuditTrail* auditTrail() { return fContext->auditTrail(); }
-
-    // CONTEXT TODO: remove this backdoor
-    // In order to make progress we temporarily need a way to break CL impasses.
-    GrContext* backdoor();
 
 #if GR_TEST_UTILS
     // Used by tests that intentionally exercise codepaths that print warning messages, in order to
@@ -115,8 +113,8 @@ public:
 
 private:
     explicit GrRecordingContextPriv(GrRecordingContext* context) : fContext(context) {}
-    GrRecordingContextPriv(const GrRecordingContextPriv&); // unimpl
-    GrRecordingContextPriv& operator=(const GrRecordingContextPriv&); // unimpl
+    GrRecordingContextPriv(const GrRecordingContextPriv&) = delete;
+    GrRecordingContextPriv& operator=(const GrRecordingContextPriv&) = delete;
 
     // No taking addresses of this type.
     const GrRecordingContextPriv* operator&() const;
@@ -129,7 +127,7 @@ private:
 
 inline GrRecordingContextPriv GrRecordingContext::priv() { return GrRecordingContextPriv(this); }
 
-inline const GrRecordingContextPriv GrRecordingContext::priv () const {
+inline const GrRecordingContextPriv GrRecordingContext::priv () const {  // NOLINT(readability-const-return-type)
     return GrRecordingContextPriv(const_cast<GrRecordingContext*>(this));
 }
 

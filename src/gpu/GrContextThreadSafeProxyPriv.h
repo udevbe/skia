@@ -39,6 +39,9 @@ public:
     GrTextBlobCache* getTextBlobCache() { return fProxy->fTextBlobCache.get(); }
     const GrTextBlobCache* getTextBlobCache() const { return fProxy->fTextBlobCache.get(); }
 
+    GrThreadSafeCache* threadSafeCache() { return fProxy->fThreadSafeCache.get(); }
+    const GrThreadSafeCache* threadSafeCache() const { return fProxy->fThreadSafeCache.get(); }
+
     void abandonContext() { fProxy->abandonContext(); }
     bool abandoned() const { return fProxy->abandoned(); }
 
@@ -63,7 +66,7 @@ inline GrContextThreadSafeProxyPriv GrContextThreadSafeProxy::priv() {
     return GrContextThreadSafeProxyPriv(this);
 }
 
-inline const GrContextThreadSafeProxyPriv GrContextThreadSafeProxy::priv() const {
+inline const GrContextThreadSafeProxyPriv GrContextThreadSafeProxy::priv() const {  // NOLINT(readability-const-return-type)
     return GrContextThreadSafeProxyPriv(const_cast<GrContextThreadSafeProxy*>(this));
 }
 

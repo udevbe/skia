@@ -11,7 +11,7 @@
 #include "include/gpu/GrRecordingContext.h"
 #include "src/gpu/GrCaps.h"
 #include "src/gpu/GrColorInfo.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrRecordingContextPriv.h"
 #include "src/gpu/GrRenderTargetContext.h"
 #include "src/gpu/SkGr.h"
@@ -190,14 +190,15 @@ void SkGlyphRunListPainter::processGlyphRunList(const SkGlyphRunList& glyphRunLi
 
             SkScopedStrikeForGPU strike = strikeSpec.findOrCreateScopedStrike(fStrikeCache);
 
-            fDrawable.startGPUDevice(fRejects.source(), origin, drawMatrix, strike->roundingSpec());
+            SkPoint residual = fDrawable.startGPUDevice(
+                    fRejects.source(), origin, drawMatrix, strike->roundingSpec());
             strike->prepareForMaskDrawing(&fDrawable, &fRejects);
             fRejects.flipRejectsToSource();
 
             if (process && !fDrawable.drawableIsEmpty()) {
                 // processDeviceMasks must be called even if there are no glyphs to make sure runs
                 // are set correctly.
-                process->processDeviceMasks(fDrawable.drawable(), strikeSpec);
+                process->processDeviceMasks(fDrawable.drawable(), strikeSpec, residual);
             }
         }
 

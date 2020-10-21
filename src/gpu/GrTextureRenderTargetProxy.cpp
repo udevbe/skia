@@ -9,7 +9,6 @@
 
 #include "src/gpu/GrCaps.h"
 #include "src/gpu/GrRenderTarget.h"
-#include "src/gpu/GrRenderTargetProxyPriv.h"
 #include "src/gpu/GrSurface.h"
 #include "src/gpu/GrSurfaceProxyPriv.h"
 #include "src/gpu/GrTexture.h"
@@ -17,7 +16,7 @@
 
 #ifdef SK_DEBUG
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #endif
 
 // Deferred version
@@ -90,20 +89,20 @@ GrTextureRenderTargetProxy::GrTextureRenderTargetProxy(sk_sp<GrSurface> surf,
 
 void GrTextureRenderTargetProxy::initSurfaceFlags(const GrCaps& caps) {
     // FBO 0 should never be wrapped as a texture render target.
-    SkASSERT(!this->rtPriv().glRTFBOIDIs0());
+    SkASSERT(!this->glRTFBOIDIs0());
     if (this->numSamples() > 1 && !caps.msaaResolvesAutomatically())  {
         // MSAA texture-render-targets always require manual resolve if we are not using a
         // multisampled-render-to-texture extension.
         //
         // NOTE: This is the only instance where we need to set the manual resolve flag on a proxy.
-        // Any other proxies that require manual resolve (e.g., wrapBackendTextureAsRenderTarget())
-        // will be wrapped, and the wrapped version of the GrSurface constructor will automatically
-        // get the manual resolve flag when copying the target GrSurface's flags.
+        // Any other proxies that require manual resolve (e.g., wrapRenderableBackendTexture() with
+        // a sample count)  will be wrapped, and the wrapped version of the GrSurface constructor
+        // will automatically get the manual resolve flag when copying the target GrSurface's flags.
         fSurfaceFlags |= GrInternalSurfaceFlags::kRequiresManualMSAAResolve;
     }
 }
 
-size_t GrTextureRenderTargetProxy::onUninstantiatedGpuMemorySize(const GrCaps& caps) const {
+size_t GrTextureRenderTargetProxy::onUninstantiatedGpuMemorySize() const {
     int colorSamplesPerPixel = this->numSamples();
     if (colorSamplesPerPixel > 1) {
         // Add one to account for the resolve buffer.
@@ -111,7 +110,7 @@ size_t GrTextureRenderTargetProxy::onUninstantiatedGpuMemorySize(const GrCaps& c
     }
 
     // TODO: do we have enough information to improve this worst case estimate?
-    return GrSurface::ComputeSize(caps, this->backendFormat(), this->dimensions(),
+    return GrSurface::ComputeSize(this->backendFormat(), this->dimensions(),
                                   colorSamplesPerPixel, this->proxyMipmapped(),
                                   !this->priv().isExact());
 }
@@ -194,6 +193,13 @@ void GrTextureRenderTargetProxy::onValidateSurface(const GrSurface* surface) {
 
     SkASSERT(((int)proxyFlags & kGrInternalTextureRenderTargetFlagsMask) ==
              ((int)surfaceFlags & kGrInternalTextureRenderTargetFlagsMask));
+
+    // We manually check the kVkRTSupportsInputAttachment since we only require it on the surface if
+    // the proxy has it set. If the proxy doesn't have the flag it is legal for the surface to
+    // have the flag.
+    if (proxyFlags & GrInternalSurfaceFlags::kVkRTSupportsInputAttachment) {
+        SkASSERT(surfaceFlags & GrInternalSurfaceFlags::kVkRTSupportsInputAttachment);
+    }
 }
 #endif
 

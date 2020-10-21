@@ -98,9 +98,9 @@ static sk_sp<SkImageFilter> arithmetic_factory(sk_sp<SkImage> auxImage, const Sk
                                       nullptr, cropRect);
 }
 
-static sk_sp<SkImageFilter> xfermode_factory(sk_sp<SkImage> auxImage, const SkIRect* cropRect) {
+static sk_sp<SkImageFilter> blend_factory(sk_sp<SkImage> auxImage, const SkIRect* cropRect) {
     sk_sp<SkImageFilter> background = SkImageFilters::Image(std::move(auxImage));
-    return SkImageFilters::Xfermode(
+    return SkImageFilters::Blend(
             SkBlendMode::kModulate, std::move(background), nullptr, cropRect);
 }
 
@@ -178,7 +178,7 @@ namespace {
         // Uses saveLayer after clipRect() to filter on the restore (i.e. reference image)
         kSaveLayer
     };
-};
+}  // namespace
 
 // In this GM, we're going to feed the inner portion of a 100x100 mandrill (i.e., strip off a
 // 25-wide border) through the makeWithFilter method. We'll then draw the appropriate subset of the
@@ -233,7 +233,7 @@ protected:
             erode_factory,
             displacement_factory,
             arithmetic_factory,
-            xfermode_factory,
+            blend_factory,
             convolution_factory,
             matrix_factory,
             alpha_threshold_factory,
@@ -249,7 +249,7 @@ protected:
             "Erode",
             "Displacement",
             "Arithmetic",
-            "Xfer Mode",
+            "Xfer Mode", // "blend"
             "Convolution",
             "Matrix Xform",
             "Alpha Threshold",
@@ -389,7 +389,7 @@ private:
         }
     }
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 // The different strategies should all look the same, with the exception of filters that affect
 // transparent black (i.e. the lighting filter). In the save layer case, the filter affects the

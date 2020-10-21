@@ -7,7 +7,7 @@
 
 #include "include/core/SkSurface.h"
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrProxyProvider.h"
 #include "src/gpu/mtl/GrMtlGpu.h"
 #include "tests/Test.h"
@@ -39,7 +39,7 @@ DEF_GPUTEST_FOR_METAL_CONTEXT(MtlCopySurfaceTest, reporter, ctxInfo) {
     // TODO: check multisampled RT as well
     GrMtlTextureInfo fbInfo;
     fbInfo.fTexture.retain((__bridge const void*)(drawable.texture));
-    GrBackendRenderTarget backendRT(kWidth, kHeight, 1, fbInfo);
+    GrBackendRenderTarget backendRT(kWidth, kHeight, fbInfo);
 
     GrProxyProvider* proxyProvider = context->priv().proxyProvider();
     sk_sp<GrSurfaceProxy> srcProxy = proxyProvider->wrapBackendRenderTarget(backendRT, nullptr);

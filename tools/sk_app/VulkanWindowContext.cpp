@@ -219,6 +219,12 @@ bool VulkanWindowContext::createSwapchain(int width, int height,
                                    VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
                                    VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     SkASSERT((caps.supportedUsageFlags & usageFlags) == usageFlags);
+    if (caps.supportedUsageFlags & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) {
+        usageFlags |= VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT;
+    }
+    if (caps.supportedUsageFlags & VK_IMAGE_USAGE_SAMPLED_BIT) {
+        usageFlags |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    }
     SkASSERT(caps.supportedTransforms & caps.currentTransform);
     SkASSERT(caps.supportedCompositeAlpha & (VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR |
                                              VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR));
@@ -318,13 +324,20 @@ bool VulkanWindowContext::createSwapchain(int width, int height,
         fDestroySwapchainKHR(fDevice, swapchainCreateInfo.oldSwapchain, nullptr);
     }
 
-    this->createBuffers(swapchainCreateInfo.imageFormat, colorType,
-                        swapchainCreateInfo.imageSharingMode);
+    if (!this->createBuffers(swapchainCreateInfo.imageFormat, usageFlags, colorType,
+                             swapchainCreateInfo.imageSharingMode)) {
+        fDeviceWaitIdle(fDevice);
+
+        this->destroyBuffers();
+
+        fDestroySwapchainKHR(fDevice, swapchainCreateInfo.oldSwapchain, nullptr);
+    }
 
     return true;
 }
 
-void VulkanWindowContext::createBuffers(VkFormat format, SkColorType colorType,
+bool VulkanWindowContext::createBuffers(VkFormat format, VkImageUsageFlags usageFlags,
+                                        SkColorType colorType,
                                         VkSharingMode sharingMode) {
     fGetSwapchainImagesKHR(fDevice, fSwapchain, &fImageCount, nullptr);
     SkASSERT(fImageCount);
@@ -343,24 +356,29 @@ void VulkanWindowContext::createBuffers(VkFormat format, SkColorType colorType,
         info.fImageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         info.fImageTiling = VK_IMAGE_TILING_OPTIMAL;
         info.fFormat = format;
+        info.fImageUsageFlags = usageFlags;
         info.fLevelCount = 1;
         info.fCurrentQueueFamily = fPresentQueueIndex;
         info.fSharingMode = sharingMode;
 
-        if (fSampleCount == 1) {
+        if (usageFlags & VK_IMAGE_USAGE_SAMPLED_BIT) {
+            GrBackendTexture backendTexture(fWidth, fHeight, info);
+            fSurfaces[i] = SkSurface::MakeFromBackendTexture(
+                    fContext.get(), backendTexture, kTopLeft_GrSurfaceOrigin,
+                    fDisplayParams.fMSAASampleCount,
+                    colorType, fDisplayParams.fColorSpace, &fDisplayParams.fSurfaceProps);
+        } else {
+            if (fDisplayParams.fMSAASampleCount > 1) {
+                return false;
+            }
             GrBackendRenderTarget backendRT(fWidth, fHeight, fSampleCount, info);
-
             fSurfaces[i] = SkSurface::MakeFromBackendRenderTarget(
                     fContext.get(), backendRT, kTopLeft_GrSurfaceOrigin, colorType,
                     fDisplayParams.fColorSpace, &fDisplayParams.fSurfaceProps);
-        } else {
-            GrBackendTexture backendTexture(fWidth, fHeight, info);
 
-            // We don't set the sampled usage bit on the swapchain so this can't be a GrTexture.
-            fSurfaces[i] = SkSurface::MakeFromBackendTextureAsRenderTarget(
-                    fContext.get(), backendTexture, kTopLeft_GrSurfaceOrigin, fSampleCount,
-                    colorType, fDisplayParams.fColorSpace, &fDisplayParams.fSurfaceProps);
-
+        }
+        if (!fSurfaces[i]) {
+            return false;
         }
     }
 
@@ -382,6 +400,7 @@ void VulkanWindowContext::createBuffers(VkFormat format, SkColorType colorType,
         SkASSERT(result == VK_SUCCESS);
     }
     fCurrentBackbufferIndex = fImageCount;
+    return true;
 }
 
 void VulkanWindowContext::destroyBuffers() {
@@ -430,6 +449,7 @@ void VulkanWindowContext::destroyContext() {
         }
     }
 
+    SkASSERT(fContext->unique());
     fContext.reset();
     fInterface.reset();
 
@@ -537,13 +557,13 @@ void VulkanWindowContext::swapBuffers() {
     const VkPresentInfoKHR presentInfo =
     {
         VK_STRUCTURE_TYPE_PRESENT_INFO_KHR, // sType
-        NULL, // pNext
+        nullptr, // pNext
         1, // waitSemaphoreCount
         &backbuffer->fRenderSemaphore, // pWaitSemaphores
         1, // swapchainCount
         &fSwapchain, // pSwapchains
         &backbuffer->fImageIndex, // pImageIndices
-        NULL // pResults
+        nullptr // pResults
     };
 
     fQueuePresentKHR(fPresentQueue, &presentInfo);

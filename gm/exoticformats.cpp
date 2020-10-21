@@ -13,6 +13,7 @@
 #include "include/gpu/GrRecordingContext.h"
 #include "src/core/SkCompressedDataUtils.h"
 #include "src/core/SkMipmap.h"
+#include "src/gpu/GrImageContextPriv.h"
 #include "src/gpu/GrRecordingContextPriv.h"
 #include "src/gpu/gl/GrGLDefines.h"
 #include "src/image/SkImage_Base.h"
@@ -57,7 +58,7 @@ static sk_sp<SkData> load_ktx(const char* filename, ImageInfo* imageInfo) {
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A
     };
 
-    if (memcmp(header, kExpectedIdentifier, kKTXIdentifierSize)) {
+    if (0 != memcmp(header, kExpectedIdentifier, kKTXIdentifierSize)) {
         return nullptr;
     }
 
@@ -380,8 +381,7 @@ protected:
 
         bool isCompressed = false;
         if (image->isTextureBacked()) {
-            GrRecordingContext* rContext = ((SkImage_GpuBase*) image)->context();
-            const GrCaps* caps = rContext->priv().caps();
+            const GrCaps* caps = as_IB(image)->context()->priv().caps();
 
             GrTextureProxy* proxy = as_IB(image)->peekProxy();
             isCompressed = caps->isFormatCompressed(proxy->backendFormat());
@@ -434,10 +434,10 @@ private:
     sk_sp<SkImage> fETC1Image;
     sk_sp<SkImage> fBC1Image;
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_GM(return new ExoticFormatsGM;)
-}
+}  // namespace skiagm

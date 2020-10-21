@@ -3601,7 +3601,8 @@ DEF_TEST(SkParagraph_EmojiMultiLineRectsParagraph, reporter) {
     canvas.drawRects(SK_ColorRED, result);
 
     result = paragraph->getRectsForRange(122, 132, rect_height_style, rect_width_style);
-    REPORTER_ASSERT(reporter, result.size() == 1);
+    REPORTER_ASSERT(reporter, result.size() == 0);
+    // We changed the selection algorithm and now the selection is empty
     canvas.drawRects(SK_ColorBLUE, result);
 
     auto pos = paragraph->getGlyphPositionAtCoordinate(610, 100).position;
@@ -3677,7 +3678,9 @@ DEF_TEST(SkParagraph_Ellipsize, reporter) {
 
     ParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(1);
-    paragraph_style.setEllipsis(u"\u2026");
+    std::u16string ellipsis = u"\u2026";
+    paragraph_style.setEllipsis(ellipsis);
+    std::u16string e = paragraph_style.getEllipsisUtf16();
     paragraph_style.turnHintingOff();
     ParagraphBuilderImpl builder(paragraph_style, fontCollection);
 
@@ -4825,6 +4828,8 @@ DEF_TEST(SkParagraph_EmptyParagraphWithLineBreak, reporter) {
     sk_sp<ResourceFontCollection> fontCollection = sk_make_sp<ResourceFontCollection>();
     if (!fontCollection->fontsFound()) return;
     fontCollection->setDefaultFontManager(SkFontMgr::RefDefault());
+    fontCollection->enableFontFallback();
+
     TestCanvas canvas("SkParagraph_EmptyParagraphWithLineBreak.png");
 
     ParagraphStyle paragraph_style;
@@ -4832,12 +4837,17 @@ DEF_TEST(SkParagraph_EmptyParagraphWithLineBreak, reporter) {
     text_style.setFontSize(16);
     text_style.setFontFamilies({SkString("Roboto")});
     ParagraphBuilderImpl builder(paragraph_style, fontCollection);
-    builder.addText("\n", 1);
+    builder.addText("abc\n\ndef");
 
     auto paragraph = builder.Build();
     paragraph->layout(TestCanvasWidth);
     paragraph->paint(canvas.get(), 0, 0);
-    auto result = paragraph->getRectsForPlaceholders();
+
+    // Select a position at the second (empty) line
+    auto pos = paragraph->getGlyphPositionAtCoordinate(0, 21);
+    REPORTER_ASSERT(reporter, pos.affinity == Affinity::kDownstream && pos.position == 4);
+    auto rect = paragraph->getRectsForRange(4, 5, RectHeightStyle::kTight, RectWidthStyle::kTight);
+    REPORTER_ASSERT(reporter, rect.size() == 1 && rect[0].rect.width() == 0);
 }
 
 DEF_TEST(SkParagraph_NullInMiddleOfText, reporter) {
@@ -4916,7 +4926,7 @@ DEF_TEST(SkParagraph_Fallbacks, reporter) {
         auto paragraph = builder.Build();
         paragraph->layout(TestCanvasWidth);
         paragraph->paint(canvas.get(), 0, 0);
-        canvas.get()->translate(0, paragraph.get()->getHeight() + 10);
+        canvas.get()->translate(0, paragraph->getHeight() + 10);
     }
 }
 
@@ -5400,19 +5410,18 @@ DEF_TEST(SkParagraph_PlaceholderHeightInf, reporter) {
     placeholder_style.fBaselineOffset = SK_ScalarInfinity;
 
     ParagraphStyle paragraph_style;
-
+    paragraph_style.setDrawOptions(DrawOptions::kRecord);
     ParagraphBuilderImpl builder(paragraph_style, fontCollection);
     builder.pushStyle(text_style);
     builder.addText("Limited by budget");
     builder.addPlaceholder(placeholder_style);
     auto paragraph = builder.Build();
     paragraph->layout(SK_ScalarInfinity);
+    paragraph->paint(canvas.get(), 0, 0);
 
     auto impl = static_cast<ParagraphImpl*>(paragraph.get());
-    REPORTER_ASSERT(reporter, SkScalarIsFinite(impl->getBoundaries().height()));
-    REPORTER_ASSERT(reporter, SkScalarIsFinite(impl->getBoundaries().width()));
-
-    paragraph->paint(canvas.get(), 0, 0);
+    REPORTER_ASSERT(reporter, SkScalarIsFinite(impl->getPicture()->cullRect().height()));
+    REPORTER_ASSERT(reporter, SkScalarIsFinite(impl->getPicture()->cullRect().width()));
 }
 
 DEF_TEST(SkParagraph_LineMetricsTextAlign, reporter) {

@@ -9,6 +9,7 @@
 
 #include "include/core/SkBitmap.h"
 #include "include/private/SkColorData.h"
+#include "include/private/SkTPin.h"
 #include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkSpecialImage.h"
@@ -50,7 +51,7 @@ private:
     SkRect   fSrcRect;
     SkScalar fInset;
 
-    typedef SkImageFilter_Base INHERITED;
+    using INHERITED = SkImageFilter_Base;
 };
 
 } // end namespace

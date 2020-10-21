@@ -2,9 +2,14 @@
 
 #include "modules/skparagraph/src/Iterators.h"
 #include "modules/skparagraph/src/OneLineShaper.h"
-#include "modules/skparagraph/src/ParagraphUtil.h"
+#include "src/utils/SkUTF.h"
 #include <algorithm>
 #include <unordered_set>
+
+static inline SkUnichar nextUtf8Unit(const char** ptr, const char* end) {
+    SkUnichar val = SkUTF::NextUTF8(ptr, end);
+    return val < 0 ? 0xFFFD : val;
+}
 
 namespace skia {
 namespace textlayout {
@@ -177,7 +182,7 @@ void OneLineShaper::finish(TextRange blockText, SkScalar height, SkScalar& advan
         if (block.isFullyResolved()) {
             // Just move the entire run
             block.fRun->fIndex = this->fParagraph->fRuns.size();
-            this->fParagraph->fRuns.emplace_back(*block.fRun.get());
+            this->fParagraph->fRuns.emplace_back(*block.fRun);
             block.fRun.reset();
             continue;
         } else if (run == nullptr) {
@@ -297,8 +302,8 @@ void OneLineShaper::sortOutGlyphs(std::function<void(GlyphRange)>&& sortOutUnres
 
         const char* cluster = text.begin() + clusterIndex(i);
         SkUnichar codepoint = nextUtf8Unit(&cluster, text.end());
-        bool isControl8 = isControl(codepoint);
-        bool isWhitespace8 = isWhitespace(codepoint);
+        bool isControl8 = fParagraph->getUnicode()->isControl(codepoint);
+        bool isWhitespace8 = fParagraph->getUnicode()->isWhitespace(codepoint);
 
         // Inspect the glyph
         auto glyph = fCurrentRun->fGlyphs[i];
@@ -477,7 +482,7 @@ bool OneLineShaper::iterateThroughShapingRegions(const ShapeVisitor& shape) {
         if (placeholder.fTextBefore.width() > 0) {
             // Shape the text by bidi regions
             while (bidiIndex < fParagraph->fBidiRegions.size()) {
-                BidiRegion& bidiRegion = fParagraph->fBidiRegions[bidiIndex];
+                SkUnicode::BidiRegion& bidiRegion = fParagraph->fBidiRegions[bidiIndex];
                 auto start = std::max(bidiRegion.start, placeholder.fTextBefore.start);
                 auto end = std::min(bidiRegion.end, placeholder.fTextBefore.end);
 
@@ -598,8 +603,8 @@ bool OneLineShaper::shape() {
                     LangIterator langIter(unresolvedText, blockSpan,
                                       fParagraph->paragraphStyle().getTextStyle());
                     SkShaper::TrivialBiDiRunIterator bidiIter(defaultBidiLevel, unresolvedText.size());
-                    auto scriptIter = SkShaper::MakeHbIcuScriptRunIterator
-                                     (unresolvedText.begin(), unresolvedText.size());
+                    auto scriptIter = SkShaper::MakeSkUnicodeHbScriptRunIterator
+                                     (fParagraph->getUnicode(), unresolvedText.begin(), unresolvedText.size());
                     fCurrentText = unresolvedRange;
                     shaper->shape(unresolvedText.begin(), unresolvedText.size(),
                             fontIter, bidiIter,*scriptIter, langIter,
@@ -695,5 +700,5 @@ size_t OneLineShaper::FontKey::Hasher::operator()(const OneLineShaper::FontKey& 
            SkGoodHash()(key.fLocale.c_str());
 }
 
-}
-}
+}  // namespace textlayout
+}  // namespace skia

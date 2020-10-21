@@ -10,7 +10,7 @@
 #include "tests/Test.h"
 
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrImageInfo.h"
 #include "src/gpu/GrRenderTargetContext.h"
 #include "src/gpu/GrTextureProxy.h"
@@ -61,7 +61,7 @@ DEF_GPUTEST_FOR_RENDERING_CONTEXTS(RenderTargetContextTest, reporter, ctxInfo) {
         SkAutoTMalloc<uint32_t> dstBuffer(kSize * kSize);
         static const size_t kRowBytes = sizeof(uint32_t) * kSize;
 
-        bool result = rtCtx->readPixels(dstInfo, dstBuffer.get(), kRowBytes, {0, 0});
+        bool result = rtCtx->readPixels(dContext, dstInfo, dstBuffer.get(), kRowBytes, {0, 0});
         REPORTER_ASSERT(reporter, result);
 
         check_instantiation_status(reporter, rtCtx.get(), true);

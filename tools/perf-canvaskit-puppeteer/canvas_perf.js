@@ -1,11 +1,22 @@
+const onlytests = [];
 const tests = [];
+// In all tests, the canvas is 600 by 600 px.
+// tests should NOT call ctx.surface.flush()
+// flush is done by benchmark.js
+
+function randomColorTwo(CanvasKit, i, j) {
+    c = [1, 1, 1, 1];
+    c[i] = Math.random();
+    c[j] = Math.random();
+    return CanvasKit.Color4f(...c);
+}
 
 function randomColor(CanvasKit) {
     return CanvasKit.Color4f(Math.random(), Math.random(), Math.random(), Math.random());
 }
 
 function starPath(CanvasKit, X=128, Y=128, R=116) {
-    const p = new CanvasKit.SkPath();
+    const p = new CanvasKit.Path();
     p.moveTo(X + R, Y);
     for (let i = 1; i < 8; i++) {
       let a = 2.6927937 * i;
@@ -16,7 +27,7 @@ function starPath(CanvasKit, X=128, Y=128, R=116) {
 }
 
 tests.push({
-    description: 'Draw 10K colored regions',
+    description: 'Draw 10K colored rect clips',
     setup: function(CanvasKit, ctx) {
         ctx.canvas = ctx.surface.getCanvas();
     },
@@ -28,13 +39,133 @@ tests.push({
             ctx.canvas.save();
             ctx.canvas.clipRect(CanvasKit.LTRBRect(x, y, x+50, y+50),
                                 CanvasKit.ClipOp.Intersect, false);
-            ctx.canvas.drawColor(randomColor(CanvasKit), CanvasKit.BlendMode.SrcOver);
+            ctx.canvas.drawColor(randomColorTwo(CanvasKit, 0, 1), CanvasKit.BlendMode.SrcOver);
             ctx.canvas.restore();
         }
-        ctx.surface.flush();
     },
     teardown: function(CanvasKit, ctx) {},
     perfKey: 'canvas_drawColor',
+});
+
+tests.push({
+    description: 'Draw 10K colored ellipses',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+    },
+    test: function(CanvasKit, ctx) {
+        for (let i=0; i<10000; i++) {
+            const x = Math.random()*550;
+            const y = Math.random()*550;
+            ctx.paint.setColor(randomColorTwo(CanvasKit, 1, 2));
+            ctx.canvas.drawOval(CanvasKit.LTRBRect(x, y, x+50, y+50), ctx.paint);
+        }
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+    },
+    perfKey: 'canvas_drawOval',
+});
+
+tests.push({
+    description: 'Draw 10K colored roundRects',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+    },
+    test: function(CanvasKit, ctx) {
+        for (let i=0; i<10000; i++) {
+            const x = Math.random()*550;
+            const y = Math.random()*550;
+            ctx.paint.setColor(randomColorTwo(CanvasKit, 0, 2));
+            const rr = CanvasKit.RRectXY(CanvasKit.LTRBRect(x, y, x+50, y+50), 10, 10,);
+            ctx.canvas.drawRRect(rr, ctx.paint);
+        }
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+    },
+    perfKey: 'canvas_drawRRect',
+});
+
+tests.push({
+    description: 'Draw 10K colored rects',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+    },
+    test: function(CanvasKit, ctx) {
+        for (let i=0; i<10000; i++) {
+            const x = Math.random()*550;
+            const y = Math.random()*550;
+            ctx.paint.setColor(randomColorTwo(CanvasKit, 1, 2));
+            ctx.canvas.drawRect(CanvasKit.LTRBRect(x, y, x+50, y+50), ctx.paint);
+        }
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+    },
+    perfKey: 'canvas_drawRect',
+});
+
+tests.push({
+    description: "Draw 10K colored rects with malloc'd rect",
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+        ctx.rect = CanvasKit.Malloc(Float32Array, 4);
+    },
+    test: function(CanvasKit, ctx) {
+        for (let i=0; i<10000; i++) {
+            ctx.paint.setColor(randomColorTwo(CanvasKit, 1, 2));
+            const ta = ctx.rect.toTypedArray();
+            ta[0] = Math.random()*550; // x
+            ta[1] = Math.random()*550; // y
+            ta[2] = ta[0] + 50;
+            ta[3] = ta[1] + 50;
+            ctx.canvas.drawRect(ta, ctx.paint);
+        }
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+        CanvasKit.Free(ctx.rect);
+    },
+    perfKey: 'canvas_drawRect_malloc',
+});
+
+tests.push({
+    description: 'Draw 10K colored rects using 4 float API',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+    },
+    test: function(CanvasKit, ctx) {
+        for (let i=0; i<10000; i++) {
+            const x = Math.random()*550;
+            const y = Math.random()*550;
+            ctx.paint.setColor(randomColorTwo(CanvasKit, 1, 2));
+            ctx.canvas.drawRect4f(x, y, x+50, y+50, ctx.paint);
+        }
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+    },
+    perfKey: 'canvas_drawRect4f',
 });
 
 tests.push({
@@ -60,7 +191,7 @@ tests.push({
 tests.push({
     description: 'Get and set the color to a paint',
     setup: function(CanvasKit, ctx) {
-        ctx.paint = new CanvasKit.SkPaint();
+        ctx.paint = new CanvasKit.Paint();
     },
     test: function(CanvasKit, ctx) {
         for (let i = 0; i < 10; i++) {
@@ -81,7 +212,7 @@ tests.push({
 tests.push({
     description: 'Set the color to a paint by components',
     setup: function(CanvasKit, ctx) {
-        ctx.paint = new CanvasKit.SkPaint();
+        ctx.paint = new CanvasKit.Paint();
     },
     test: function(CanvasKit, ctx) {
         const r = Math.random();
@@ -117,7 +248,6 @@ tests.push({
         const out = CanvasKit.computeTonalColors(ctx.input);
         ctx.canvas.drawShadow(ctx.path, ctx.zPlaneParams, ctx.lightPos, ctx.lightRadius,
                               out.ambient, out.spot, ctx.flags);
-        ctx.surface.flush();
     },
     teardown: function(CanvasKit, ctx) {},
     perfKey: 'canvas_drawShadow',
@@ -136,21 +266,20 @@ tests.push({
         positions = Array(num);
         // Create an array of colors spaced evenly along the 0..1 range of positions.
         for (let i=0; i<num; i++) {
-            colors[i] = randomColor(CanvasKit);
+            colors[i] = randomColorTwo(CanvasKit, 2, 3);
             positions[i] = i/num;
         }
         // make a gradient from those colors
-        const shader = CanvasKit.SkShader.MakeRadialGradient(
+        const shader = CanvasKit.Shader.MakeRadialGradient(
             [300, 300], 50, // center, radius
             colors, positions,
             CanvasKit.TileMode.Mirror,
         );
         // Fill the canvas using the gradient shader.
-        const paint = new CanvasKit.SkPaint();
+        const paint = new CanvasKit.Paint();
         paint.setStyle(CanvasKit.PaintStyle.Fill);
         paint.setShader(shader);
         ctx.canvas.drawPaint(paint);
-        ctx.surface.flush();
 
         shader.delete();
         paint.delete();
@@ -159,17 +288,94 @@ tests.push({
     perfKey: 'canvas_drawHugeGradient',
 });
 
-// TODO(nifong): handle tests that have data dependencies such as test images.
+tests.push({
+    description: 'Draw a png image',
+    setup: async function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+        ctx.paint = new CanvasKit.Paint();
+        ctx.img = CanvasKit.MakeImageFromEncoded(ctx.files['test_512x512.png']);
+        ctx.frame = 0;
+    },
+    test: function(CanvasKit, ctx) {
+        ctx.canvas.clear(CanvasKit.WHITE);
+        // Make the image to move so you can see visually that the test is running.
+        ctx.canvas.drawImage(ctx.img, ctx.frame, ctx.frame, ctx.paint);
+        ctx.frame++;
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.img.delete();
+        ctx.paint.delete();
+    },
+    perfKey: 'canvas_drawPngImage',
+});
+
+
+function htmlImageElementToDataURL(htmlImageElement) {
+    const canvas = document.createElement('canvas');
+    canvas.height = htmlImageElement.height;
+    canvas.width = htmlImageElement.width;
+    const ctx = canvas.getContext('2d')
+    ctx.drawImage(htmlImageElement, 0, 0);
+    return canvas.toDataURL();
+}
+
+// This for loop generates two perf cases for each test image. One uses browser APIs
+// to decode an image, and the other uses codecs included in the CanvasKit wasm to decode an
+// image. wasm codec Image decoding is faster (50 microseconds vs 20000 microseconds), but
+// including codecs in wasm increases the size of the CanvasKit wasm binary.
+for (const testImageFilename of ['test_64x64.png', 'test_512x512.png', 'test_1500x959.jpg']) {
+    const htmlImageElement = new Image();
+    htmlImageElementLoadPromise = new Promise((resolve) =>
+        htmlImageElement.addEventListener('load', resolve));
+    // Create a data url of the image so that load and decode time can be measured
+    // while ignoring the time of getting the image from disk / the network.
+    imageDataURLPromise = htmlImageElementLoadPromise.then(() =>
+        htmlImageElementToDataURL(htmlImageElement));
+    htmlImageElement.src = `/static/assets/${testImageFilename}`;
+
+    tests.push({
+        description: 'Decode an image using HTMLImageElement and Canvas2D',
+        setup: async function(CanvasKit, ctx) {
+            ctx.imageDataURL = await imageDataURLPromise;
+        },
+        test: async function(CanvasKit, ctx) {
+            const image = new Image();
+            // Testing showed that waiting for the load event is faster than waiting for
+            // image.decode().
+            // Despite the name, both of them would decode the image, it was loaded in setup.
+            // HTMLImageElement.decode() reference:
+            // https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/decode
+            const promise = new Promise((resolve) => image.addEventListener('load', resolve));
+            image.src = ctx.imageDataURL;
+            await promise;
+            const img = await CanvasKit.MakeImageFromCanvasImageSource(image);
+            img.delete();
+        },
+        teardown: function(CanvasKit, ctx) {},
+        perfKey: `canvas_${testImageFilename}_HTMLImageElementDecoding`,
+    });
+
+    tests.push({
+        description: 'Decode an image using codecs in wasm',
+        setup: function(CanvasKit, ctx) {},
+        test: function(CanvasKit, ctx) {
+            const img = CanvasKit.MakeImageFromEncoded(ctx.files[testImageFilename]);
+            img.delete();
+        },
+        teardown: function(CanvasKit, ctx) {},
+        perfKey: '`canvas_${testImageFilename}_wasmImageDecoding`',
+    });
+}
 
 // 3x3 matrix ops
 tests.push({
     description: 'Multiply 3x3 matrices together',
     setup: function(CanvasKit, ctx) {
-        ctx.first = CanvasKit.SkMatrix.rotated(Math.PI/2, 10, 20);
-        ctx.second = CanvasKit.SkMatrix.scaled(1, 2, 3, 4);
+        ctx.first = CanvasKit.Matrix.rotated(Math.PI/2, 10, 20);
+        ctx.second = CanvasKit.Matrix.scaled(1, 2, 3, 4);
     },
     test: function(CanvasKit, ctx) {
-        ctx.result = CanvasKit.SkMatrix.multiply(ctx.first, ctx.second);
+        ctx.result = CanvasKit.Matrix.multiply(ctx.first, ctx.second);
         if (ctx.result.length === 18) {
             throw 'this is here to keep the result from being optimized away';
         }
@@ -181,14 +387,14 @@ tests.push({
 tests.push({
     description: 'Transform a point using a matrix (mapPoint)',
     setup: function(CanvasKit, ctx) {
-        ctx.matr = CanvasKit.SkMatrix.multiply(
-            CanvasKit.SkMatrix.rotated(Math.PI/2, 10, 20),
-            CanvasKit.SkMatrix.scaled(1, 2, 3, 4),
+        ctx.matr = CanvasKit.Matrix.multiply(
+            CanvasKit.Matrix.rotated(Math.PI/2, 10, 20),
+            CanvasKit.Matrix.scaled(1, 2, 3, 4),
         ); // make an arbitrary, but interesting matrix
     },
     test: function(CanvasKit, ctx) {
         for (let i = 0; i < 30; i++) {
-            const pt = CanvasKit.SkMatrix.mapPoints(ctx.matr, [i, i]);
+            const pt = CanvasKit.Matrix.mapPoints(ctx.matr, [i, i]);
             if (pt.length === 18) {
                 throw 'this is here to keep pt from being optimized away';
             }
@@ -201,13 +407,13 @@ tests.push({
 tests.push({
     description: 'Invert a 3x3 matrix',
     setup: function(CanvasKit, ctx) {
-        ctx.matr = CanvasKit.SkMatrix.multiply(
-            CanvasKit.SkMatrix.rotated(Math.PI/2, 10, 20),
-            CanvasKit.SkMatrix.scaled(1, 2, 3, 4),
+        ctx.matr = CanvasKit.Matrix.multiply(
+            CanvasKit.Matrix.rotated(Math.PI/2, 10, 20),
+            CanvasKit.Matrix.scaled(1, 2, 3, 4),
         );
     },
     test: function(CanvasKit, ctx) {
-        ctx.result = CanvasKit.SkMatrix.invert(ctx.matr);
+        ctx.result = CanvasKit.Matrix.invert(ctx.matr);
         if (ctx.result.length === 18) {
             throw 'this is here to keep the result from being optimized away';
         }
@@ -219,13 +425,13 @@ tests.push({
 tests.push({
     description: 'Create a shader from a 3x3 matrix',
     setup: function(CanvasKit, ctx) {
-        ctx.matr = CanvasKit.SkMatrix.multiply(
-            CanvasKit.SkMatrix.rotated(Math.PI/2, 10, 20),
-            CanvasKit.SkMatrix.scaled(1, 2, 3, 4),
+        ctx.matr = CanvasKit.Matrix.multiply(
+            CanvasKit.Matrix.rotated(Math.PI/2, 10, 20),
+            CanvasKit.Matrix.scaled(1, 2, 3, 4),
         );
     },
     test: function(CanvasKit, ctx) {
-        const shader = CanvasKit.SkShader.MakeSweepGradient(
+        const shader = CanvasKit.Shader.MakeSweepGradient(
             100, 100,
             [CanvasKit.GREEN, CanvasKit.BLUE],
             [0.0, 1.0],
@@ -237,15 +443,33 @@ tests.push({
     perfKey: 'skmatrix_makeShader',
 });
 
+tests.push({
+    description: 'Concat 3x3 matrix on a canvas',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = new CanvasKit.Canvas();
+        ctx.matr = CanvasKit.Matrix.multiply(
+            CanvasKit.Matrix.rotated(Math.PI/2, 10, 20),
+            CanvasKit.Matrix.scaled(1, 2, 3, 4),
+        );
+    },
+    test: function(CanvasKit, ctx) {
+        ctx.canvas.concat(ctx.matr);
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.canvas.delete();
+    },
+    perfKey: 'skmatrix_concat',
+});
+
 // 4x4 matrix operations
 tests.push({
     description: 'Multiply 4x4 matrices together',
     setup: function(CanvasKit, ctx) {
-        ctx.first = CanvasKit.SkM44.rotated([10, 20], Math.PI/2);
-        ctx.second = CanvasKit.SkM44.scaled([1, 2, 3]);
+        ctx.first = CanvasKit.M44.rotated([10, 20, 30], Math.PI/2);
+        ctx.second = CanvasKit.M44.scaled([1, 2, 3]);
     },
     test: function(CanvasKit, ctx) {
-        ctx.result = CanvasKit.SkM44.multiply(ctx.first, ctx.second);
+        ctx.result = CanvasKit.M44.multiply(ctx.first, ctx.second);
         if (ctx.result.length === 18) {
             throw 'this is here to keep the result from being optimized away';
         }
@@ -257,14 +481,14 @@ tests.push({
 tests.push({
     description: 'Invert a 4x4 matrix',
     setup: function(CanvasKit, ctx) {
-        ctx.matr = CanvasKit.SkM44.multiply(
-            CanvasKit.SkM44.rotated([10, 20], Math.PI/2),
-            CanvasKit.SkM44.scaled([1, 2, 3]),
+        ctx.matr = CanvasKit.M44.multiply(
+            CanvasKit.M44.rotated([10, 20, 30], Math.PI/2),
+            CanvasKit.M44.scaled([1, 2, 3]),
         );
     },
     test: function(CanvasKit, ctx) {
-        ctx.result = CanvasKit.SkM44.invert(ctx.matr);
-        if (ctx.result.length === 18) {
+        const result = CanvasKit.M44.invert(ctx.matr);
+        if (result.length === 18) {
             throw 'this is here to keep the result from being optimized away';
         }
     },
@@ -275,10 +499,10 @@ tests.push({
 tests.push({
     description: 'Concat 4x4 matrix on a canvas',
     setup: function(CanvasKit, ctx) {
-        ctx.canvas = new CanvasKit.SkCanvas();
-        ctx.matr = CanvasKit.SkM44.multiply(
-            CanvasKit.SkM44.rotated([10, 20], Math.PI/2),
-            CanvasKit.SkM44.scaled([1, 2, 3]),
+        ctx.canvas = new CanvasKit.Canvas();
+        ctx.matr = CanvasKit.M44.multiply(
+            CanvasKit.M44.rotated([10, 20, 30], Math.PI/2),
+            CanvasKit.M44.scaled([1, 2, 3]),
         );
     },
     test: function(CanvasKit, ctx) {
@@ -351,7 +575,7 @@ tests.push({
             .multiply(new DOMMatrix().translate(3, 4).scale(1, 2).translate(-3, -4));
     },
     test: function(CanvasKit, ctx) {
-        const shader = CanvasKit.SkShader.MakeSweepGradient(
+        const shader = CanvasKit.Shader.MakeSweepGradient(
             100, 100,
             [CanvasKit.GREEN, CanvasKit.BLUE],
             [0.0, 1.0],
@@ -361,4 +585,101 @@ tests.push({
     },
     teardown: function(CanvasKit, ctx) {},
     perfKey: 'dommatrix_makeShader',
+});
+
+// Tests the layout and drawing of a paragraph with hundreds of words.
+// In the second variant, the colors change every frame
+// In the third variant, the font size cycles between three sizes.
+// In the fourth variant, the layout width changes.
+// in the fifth variant, all of those properties change at the same time.
+for (const variant of ['static', 'color_changing', 'size_changing', 'layout_changing', 'everything']) {
+    tests.push({
+        description: `Layout and draw a ${variant} paragraph`,
+        setup: function(CanvasKit, ctx) {
+            ctx.canvas = ctx.surface.getCanvas();
+            ctx.fontMgr = CanvasKit.FontMgr.FromData([ctx.files['Roboto-Regular.ttf']]);
+            ctx.paraStyle = new CanvasKit.ParagraphStyle({
+                textStyle: {
+                        color: CanvasKit.WHITE,
+                        fontFamilies: ['Roboto'],
+                        fontSize: 11,
+                    },
+                textAlign: CanvasKit.TextAlign.Left,
+            });
+            ctx.frame = 0;
+            ctx.text = "annap sap sa ladipidapidi rapadip sam dim dap dim dap do raka dip da da badip badip badipidipidipadisuten din dab do ".repeat(40);
+        },
+        test: function(CanvasKit, ctx) {
+            ctx.canvas.clear(CanvasKit.BLACK);
+            const builder = CanvasKit.ParagraphBuilder.Make(ctx.paraStyle, ctx.fontMgr);
+            let pos = 0;
+            let color = CanvasKit.WHITE;
+            while (pos < ctx.text.length) {
+                let size = 11;
+                if (variant === 'size_changing' || variant === 'everything') {
+                    // the bigger this modulo, the more work it takes to fill the glyph cache
+                    size += ctx.frame % 4;
+                }
+                if (variant === 'color_changing' || variant === 'everything') {
+                    color = randomColorTwo(CanvasKit, 0, 1);
+                }
+                builder.pushStyle(CanvasKit.TextStyle({
+                    color: color,
+                    fontFamilies: ['Roboto'],
+                    fontSize: size,
+                    fontStyle: {
+                        weight: CanvasKit.FontWeight.Bold,
+                    },
+                }));
+                const len = Math.floor(Math.random()*5+2);
+                builder.addText(ctx.text.slice(pos, pos+len));
+                builder.pop();
+                pos += len;
+            }
+            const paragraph = builder.build();
+            let w = 0;
+            const base_width = 520;
+            const varying_width_modulo = 70;
+            if (variant === 'layout_changing' || variant === 'everything') {
+                w = ctx.frame % varying_width_modulo;
+            }
+            paragraph.layout(base_width + w); // width in pixels to use when wrapping text
+            ctx.canvas.drawParagraph(paragraph, 10, 10);
+
+            ctx.frame++;
+            builder.delete();
+            paragraph.delete();
+        },
+        teardown: function(CanvasKit, ctx) {
+            ctx.fontMgr.delete();
+        },
+        perfKey: 'canvas_drawParagraph_'+variant,
+    });
+}
+
+tests.push({
+    description: 'Draw a path with a blur mask',
+    setup: function(CanvasKit, ctx) {
+        ctx.canvas = ctx.surface.getCanvas();
+        ctx.paint = new CanvasKit.Paint();
+        ctx.paint.setAntiAlias(true);
+        ctx.paint.setStyle(CanvasKit.PaintStyle.Fill);
+        ctx.paint.setColor(CanvasKit.Color4f(0.1, 0.7, 0.0, 1.0));
+        ctx.path = starPath(CanvasKit);
+        ctx.frame = 0;
+    },
+    test: function(CanvasKit, ctx) {
+        const sigma = 0.1 + (ctx.frame/10);
+        const blurMask = CanvasKit.MaskFilter.MakeBlur(
+            CanvasKit.BlurStyle.Normal, sigma, true);
+        ctx.paint.setMaskFilter(blurMask);
+        ctx.canvas.drawPath(ctx.path, ctx.paint);
+        blurMask.delete();
+        ctx.frame++;
+    },
+    teardown: function(CanvasKit, ctx) {
+        ctx.paint.delete();
+        ctx.path.delete();
+    },
+    perfKey: 'canvas_blur_mask_filter',
 });

@@ -117,6 +117,11 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugReportCallback(
             strstr(pMessage, "VUID-VkGraphicsPipelineCreateInfo-pDynamicStates-01522")) {
             return VK_FALSE;
         }
+        // See https://github.com/KhronosGroup/Vulkan-ValidationLayers/issues/2171
+        if (strstr(pMessage, "VUID-vkCmdDraw-None-02686") ||
+            strstr(pMessage, "VUID-vkCmdDrawIndexed-None-02686")) {
+            return VK_FALSE;
+        }
         SkDebugf("Vulkan error [%s]: code: %d: %s\n", pLayerPrefix, messageCode, pMessage);
         print_backtrace();
         SkDEBUGFAIL("Vulkan debug layer error");
@@ -478,7 +483,7 @@ bool CreateVkBackendContext(GrVkGetProc getProc,
         instanceLayerNames.push_back(instanceLayers[i].layerName);
     }
     for (int i = 0; i < instanceExtensions.count(); ++i) {
-        if (strncmp(instanceExtensions[i].extensionName, "VK_KHX", 6)) {
+        if (strncmp(instanceExtensions[i].extensionName, "VK_KHX", 6) != 0) {
             instanceExtensionNames.push_back(instanceExtensions[i].extensionName);
         }
     }
@@ -652,11 +657,17 @@ bool CreateVkBackendContext(GrVkGetProc getProc,
         // Don't use experimental extensions since they typically don't work with debug layers and
         // often are missing dependecy requirements for other extensions. Additionally, these are
         // often left behind in the driver even after they've been promoted to real extensions.
-        if (strncmp(deviceExtensions[i].extensionName, "VK_KHX", 6) &&
-            strncmp(deviceExtensions[i].extensionName, "VK_NVX", 6)) {
+        if (0 != strncmp(deviceExtensions[i].extensionName, "VK_KHX", 6) &&
+            0 != strncmp(deviceExtensions[i].extensionName, "VK_NVX", 6)) {
+
+            // This is an nvidia extension that isn't supported by the debug layers so we get lots
+            // of warnings. We don't actually use it, so it is easiest to just not enable it.
+            if (0 == strcmp(deviceExtensions[i].extensionName, "VK_NV_low_latency")) {
+                continue;
+            }
 
             if (!hasKHRBufferDeviceAddress ||
-                strcmp(deviceExtensions[i].extensionName, "VK_EXT_buffer_device_address")) {
+                0 != strcmp(deviceExtensions[i].extensionName, "VK_EXT_buffer_device_address")) {
                 deviceExtensionNames.push_back(deviceExtensions[i].extensionName);
             }
         }
@@ -792,6 +803,6 @@ void FreeVulkanFeaturesStructs(const VkPhysicalDeviceFeatures2* features) {
     }
 }
 
-}
+}  // namespace sk_gpu_test
 
 #endif

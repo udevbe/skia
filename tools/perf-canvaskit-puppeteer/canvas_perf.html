@@ -32,19 +32,45 @@
     // each for this many frames, which could add up to a long time.
     const MAX_FRAMES = 51;
 
+    // Any external files needed by tests in canvas_perf.js must be listed here.
+    // And checked in under canvas_perf_assets/
+    // tests may then fetch them from ctx.files['filename']
+    const testDataFiles = [
+      'test_64x64.png',
+      'test_512x512.png',
+      'test_1500x959.jpg',
+      'Roboto-Regular.ttf',
+    ];
+
     (function() {
+      const filePromises = [];
+      for (const filename of testDataFiles) {
+        filePromises.push(fetch('/static/assets/'+filename).then((resp) => {
+          return resp.arrayBuffer(); // this is also a promise.
+        }));
+      }
+      const externals = Promise.all(filePromises).then((results) => {
+        const files = {};
+        let i=0;
+        for (const bytes of results) {
+          // store them by name
+          files[testDataFiles[i]] = bytes;
+          i++;
+        }
+        return files;
+      });
 
       const loadCanvasKit = CanvasKitInit({
         locateFile: (file) => '/static/' + file,
       });
 
-      loadCanvasKit.then((CanvasKit) => {
+      Promise.all([loadCanvasKit, externals]).then(([CanvasKit, externalFiles]) => {
         const urlSearchParams = new URLSearchParams(window.location.search);
         let glversion = 2;
         if (urlSearchParams.has('webgl1')) {
           glversion = 1;
         }
-        const surface = getSurface(CanvasKit, glversion);
+        let surface = getSurface(CanvasKit, glversion);
         if (!surface) {
           console.error('Could not make surface', window._error);
           return;
@@ -53,17 +79,26 @@
         document.getElementById('start_bench').addEventListener('click', async () => {
           window._perfData = {};
 
-          // canvas_perf.js should have defined a single object called tests that is an array of
-          // objects having:
+          // canvas_perf.js should have defined an array called tests whose objects have:
           //  setup:    A function called once before testing begins, it is expected to make its
           //            own canvas and put it in ctx.
           //  test:     A function called to draw one frame
           //  teardown: A function called after testing finishes
           //  description:     A human readable description
           //  perfkey:  A key used to save the results in perf.skia.org.
-          for (const t of tests) {
+          //
+          // For quick local bench testing, there is also an array called onlytests. This way
+          // a developer can replace tests.push with onlytests.push to just run one or two
+          // performance benchmarks they care about.
+          let testsToRun = tests;
+          if (onlytests.length) {
+            testsToRun = onlytests;
+          }
+
+          for (const t of testsToRun) {
             let ctx = {
               'surface': surface,
+              'files': externalFiles,
             };
             console.log('Benchmarking "' + t.description + '"');
             t.setup(CanvasKit, ctx);
@@ -75,7 +110,14 @@
             t.teardown(CanvasKit, ctx);
             window._perfData[t.perfKey] = results;
 
-            // TODO(nifong): provide a function similar to startTimingFrames for timing non-visual tests.
+            // Delete and re-create surface between tests, to prevent the possibility of
+            // interference between them through the state of surface, the gl context, or things
+            // that are keyed by the surface's gen id.
+            surface.delete();
+            surface = getSurface(CanvasKit, glversion);
+
+            // TODO(nifong): provide a function similar to startTimingFrames for timing
+            // non-visual tests.
           }
           surface.delete();
           window._perfDone = true;

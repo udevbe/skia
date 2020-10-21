@@ -12,6 +12,7 @@
 #include "include/core/SkTileMode.h"
 #include "include/core/SkUnPreMultiply.h"
 #include "include/private/SkColorData.h"
+#include "include/private/SkTPin.h"
 #include "src/core/SkImageFilter_Base.h"
 #include "src/core/SkReadBuffer.h"
 #include "src/core/SkSpecialImage.h"
@@ -95,7 +96,7 @@ private:
                             const SkIRect& rect,
                             const SkIRect& bounds) const;
 
-    typedef SkImageFilter_Base INHERITED;
+    using INHERITED = SkImageFilter_Base;
 };
 
 class UncheckedPixelFetcher {

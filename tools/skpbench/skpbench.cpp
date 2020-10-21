@@ -18,7 +18,7 @@
 #include "src/core/SkOSFile.h"
 #include "src/core/SkTaskGroup.h"
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/SkGr.h"
 #include "src/utils/SkMultiPictureDocument.h"
 #include "src/utils/SkOSPath.h"
@@ -34,7 +34,7 @@
 #include "tools/gpu/GrContextFactory.h"
 
 #ifdef SK_XML
-#include "experimental/svg/model/SkSVGDOM.h"
+#include "modules/svg/include/SkSVGDOM.h"
 #include "src/xml/SkDOM.h"
 #endif
 
@@ -258,7 +258,8 @@ static void run_ddl_benchmark(sk_gpu_test::TestContext* testContext, GrDirectCon
 
     SkIRect viewport = dstSurface->imageInfo().bounds();
 
-    DDLPromiseImageHelper promiseImageHelper;
+    SkYUVAPixmapInfo::SupportedDataTypes supportedYUVADataTypes(*context);
+    DDLPromiseImageHelper promiseImageHelper(supportedYUVADataTypes);
     sk_sp<SkData> compressedPictureData = promiseImageHelper.deflateSKP(inputPicture);
     if (!compressedPictureData) {
         exitf(ExitErr::kUnavailable, "DDL: conversion of skp failed");
@@ -589,7 +590,7 @@ int main(int argc, char** argv) {
             SkImageInfo::Make(width, height, config->getColorType(), config->getAlphaType(),
                               sk_ref_sp(config->getColorSpace()));
     uint32_t flags = config->getUseDIText() ? SkSurfaceProps::kUseDeviceIndependentFonts_Flag : 0;
-    SkSurfaceProps props(flags, SkSurfaceProps::kLegacyFontHost_InitType);
+    SkSurfaceProps props(flags, kRGB_H_SkPixelGeometry);
     sk_sp<SkSurface> surface =
         SkSurface::MakeRenderTarget(ctx, SkBudgeted::kNo, info, config->getSamples(), &props);
     if (!surface) {
@@ -679,8 +680,7 @@ static sk_sp<SkPicture> create_warmup_skp() {
     stroke.setStrokeWidth(2);
 
     // Use a big path to (theoretically) warmup the CPU.
-    SkPath bigPath;
-    ToolUtils::make_big_path(bigPath);
+    SkPath bigPath = ToolUtils::make_big_path();
     recording->drawPath(bigPath, stroke);
 
     // Use a perlin shader to warmup the GPU.

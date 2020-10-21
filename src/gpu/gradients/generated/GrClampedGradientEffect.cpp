@@ -51,7 +51,7 @@ if (!%s && t.y < 0.0) {
                 args.fOutputColor, args.fOutputColor,
                 args.fUniformHandler->getUniformCStr(leftBorderColorVar), args.fOutputColor,
                 args.fUniformHandler->getUniformCStr(rightBorderColorVar));
-        SkString _coords1871("float2(half2(t.x, 0))");
+        SkString _coords1871("float2(half2(t.x, 0.0))");
         SkString _sample1871 = this->invokeChild(0, args, _coords1871.c_str());
         fragBuilder->codeAppendf(
                 R"SkSL(
@@ -103,6 +103,7 @@ bool GrClampedGradientEffect::onIsEqual(const GrFragmentProcessor& other) const 
     if (colorsAreOpaque != that.colorsAreOpaque) return false;
     return true;
 }
+bool GrClampedGradientEffect::usesExplicitReturn() const { return false; }
 GrClampedGradientEffect::GrClampedGradientEffect(const GrClampedGradientEffect& src)
         : INHERITED(kGrClampedGradientEffect_ClassID, src.optimizationFlags())
         , leftBorderColor(src.leftBorderColor)
@@ -114,3 +115,13 @@ GrClampedGradientEffect::GrClampedGradientEffect(const GrClampedGradientEffect& 
 std::unique_ptr<GrFragmentProcessor> GrClampedGradientEffect::clone() const {
     return std::make_unique<GrClampedGradientEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrClampedGradientEffect::onDumpInfo() const {
+    return SkStringPrintf(
+            "(leftBorderColor=half4(%f, %f, %f, %f), rightBorderColor=half4(%f, %f, %f, %f), "
+            "makePremul=%s, colorsAreOpaque=%s)",
+            leftBorderColor.fR, leftBorderColor.fG, leftBorderColor.fB, leftBorderColor.fA,
+            rightBorderColor.fR, rightBorderColor.fG, rightBorderColor.fB, rightBorderColor.fA,
+            (makePremul ? "true" : "false"), (colorsAreOpaque ? "true" : "false"));
+}
+#endif

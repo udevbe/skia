@@ -1,69 +1,33 @@
-
 /*
  * Copyright 2020 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
 #ifndef GrSmallPathShapeData_DEFINED
 #define GrSmallPathShapeData_DEFINED
 
 #include "src/core/SkOpts.h"
+#include "src/gpu/GrDrawOpAtlas.h"
 
-class GrSmallPathShapeDataKey  {
+class GrStyledShape;
+
+class GrSmallPathShapeDataKey {
 public:
-    GrSmallPathShapeDataKey () {}
-    GrSmallPathShapeDataKey (const GrSmallPathShapeDataKey & that) { *this = that; }
-    GrSmallPathShapeDataKey (const GrStyledShape& shape, uint32_t dim) { this->set(shape, dim); }
-    GrSmallPathShapeDataKey (const GrStyledShape& shape, const SkMatrix& ctm) {
-        this->set(shape, ctm);
-    }
-
-    GrSmallPathShapeDataKey & operator=(const GrSmallPathShapeDataKey & that) {
+    // TODO: add a move variant
+    GrSmallPathShapeDataKey(const GrSmallPathShapeDataKey& that) {
         fKey.reset(that.fKey.count());
         memcpy(fKey.get(), that.fKey.get(), fKey.count() * sizeof(uint32_t));
-        return *this;
     }
+
+    GrSmallPathShapeDataKey& operator=(const GrSmallPathShapeDataKey&) = delete;
 
     // for SDF paths
-    void set(const GrStyledShape& shape, uint32_t dim) {
-        // Shapes' keys are for their pre-style geometry, but by now we shouldn't have any
-        // relevant styling information.
-        SkASSERT(shape.style().isSimpleFill());
-        SkASSERT(shape.hasUnstyledKey());
-        int shapeKeySize = shape.unstyledKeySize();
-        fKey.reset(1 + shapeKeySize);
-        fKey[0] = dim;
-        shape.writeUnstyledKey(&fKey[1]);
-    }
+    GrSmallPathShapeDataKey(const GrStyledShape&, uint32_t dim);
 
     // for bitmap paths
-    void set(const GrStyledShape& shape, const SkMatrix& ctm) {
-        // Shapes' keys are for their pre-style geometry, but by now we shouldn't have any
-        // relevant styling information.
-        SkASSERT(shape.style().isSimpleFill());
-        SkASSERT(shape.hasUnstyledKey());
-        // We require the upper left 2x2 of the matrix to match exactly for a cache hit.
-        SkScalar sx = ctm.get(SkMatrix::kMScaleX);
-        SkScalar sy = ctm.get(SkMatrix::kMScaleY);
-        SkScalar kx = ctm.get(SkMatrix::kMSkewX);
-        SkScalar ky = ctm.get(SkMatrix::kMSkewY);
-        SkScalar tx = ctm.get(SkMatrix::kMTransX);
-        SkScalar ty = ctm.get(SkMatrix::kMTransY);
-        // Allow 8 bits each in x and y of subpixel positioning.
-        tx -= SkScalarFloorToScalar(tx);
-        ty -= SkScalarFloorToScalar(ty);
-        SkFixed fracX = SkScalarToFixed(tx) & 0x0000FF00;
-        SkFixed fracY = SkScalarToFixed(ty) & 0x0000FF00;
-        int shapeKeySize = shape.unstyledKeySize();
-        fKey.reset(5 + shapeKeySize);
-        fKey[0] = SkFloat2Bits(sx);
-        fKey[1] = SkFloat2Bits(sy);
-        fKey[2] = SkFloat2Bits(kx);
-        fKey[3] = SkFloat2Bits(ky);
-        fKey[4] = fracX | (fracY >> 8);
-        shape.writeUnstyledKey(&fKey[5]);
-    }
+    GrSmallPathShapeDataKey(const GrStyledShape&, const SkMatrix& ctm);
 
     bool operator==(const GrSmallPathShapeDataKey & that) const {
         return fKey.count() == that.fKey.count() &&
@@ -80,11 +44,13 @@ private:
     SkAutoSTArray<24, uint32_t> fKey;
 };
 
-class GrSmallPathShapeData  {
+class GrSmallPathShapeData {
 public:
-    GrSmallPathShapeDataKey     fKey;
-    SkRect                      fBounds;
-    GrDrawOpAtlas::AtlasLocator fAtlasLocator;
+    GrSmallPathShapeData(const GrSmallPathShapeDataKey& key) : fKey(key) {}
+
+    const GrSmallPathShapeDataKey fKey;
+    SkRect                        fBounds;
+    GrDrawOpAtlas::AtlasLocator   fAtlasLocator;
 
     SK_DECLARE_INTERNAL_LLIST_INTERFACE(GrSmallPathShapeData);
 

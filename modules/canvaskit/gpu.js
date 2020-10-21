@@ -11,7 +11,7 @@
         return defaultValue;
       }
 
-      CanvasKit.makeWebGLContextAsCurrent = function(canvas, attrs) {
+      CanvasKit.GetWebGLContext = function(canvas, attrs) {
         if (!canvas) {
           throw 'null canvas passed into makeWebGLContext';
         }
@@ -31,6 +31,9 @@
 
         if (attrs && attrs['majorVersion']) {
           contextAttributes['majorVersion'] = attrs['majorVersion']
+        } else {
+          // Default to WebGL 2 if available and not specified.
+          contextAttributes['majorVersion'] = (typeof WebGL2RenderingContext !== 'undefined') ? 2 : 1;
         }
 
         // This check is from the emscripten version
@@ -38,28 +41,29 @@
           throw 'explicitSwapControl is not supported';
         }
         // Creates a WebGL context and sets it to be the current context.
-        this.createContext(canvas, true, true, contextAttributes);
+        // These functions are defined in emscripten's library_webgl.js
+        var handle = GL.createContext(canvas, contextAttributes);
+        if (!handle) {
+          return 0;
+        }
+        GL.makeContextCurrent(handle);
+        return handle;
       }
-
-      CanvasKit.GetWebGLContext = function(canvas, attrs) {
-        this.makeWebGLContextAsCurrent(canvas, attrs);
-        return CanvasKit.currentContext() || 0;
-      };
 
       // idOrElement can be of types:
       //  - String - in which case it is interpreted as an id of a
       //          canvas element.
       //  - HTMLCanvasElement - in which the provided canvas element will
       //          be used directly.
-      // colorSpace - sk_sp<SkColorSpace> - one of the supported color spaces:
-      //          CanvasKit.SkColorSpace.SRGB
-      //          CanvasKit.SkColorSpace.DISPLAY_P3
-      //          CanvasKit.SkColorSpace.ADOBE_RGB
+      // colorSpace - sk_sp<ColorSpace> - one of the supported color spaces:
+      //          CanvasKit.ColorSpace.SRGB
+      //          CanvasKit.ColorSpace.DISPLAY_P3
+      //          CanvasKit.ColorSpace.ADOBE_RGB
       CanvasKit.MakeWebGLCanvasSurface = function(idOrElement, colorSpace, attrs) {
         colorSpace = colorSpace || null;
         var canvas = idOrElement;
         var isHTMLCanvas = typeof HTMLCanvasElement !== 'undefined' && canvas instanceof HTMLCanvasElement;
-        var isOffscreenCanvas = canvas instanceof OffscreenCanvas;
+        var isOffscreenCanvas = typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas;
         if (!isHTMLCanvas && !isOffscreenCanvas) {
           canvas = document.getElementById(idOrElement);
           if (!canvas) {
@@ -81,7 +85,7 @@
         // constrolled by css, and available in canvas.clientWidth/height.
         var surface = this.MakeOnScreenGLSurface(grcontext, canvas.width, canvas.height, colorSpace);
         if (!surface) {
-          SkDebug('falling back from GPU implementation to a SW based one');
+          Debug('falling back from GPU implementation to a SW based one');
           // we need to throw away the old canvas (which was locked to
           // a webGL context) and create a new one so we can
           var newCanvas = canvas.cloneNode(true);

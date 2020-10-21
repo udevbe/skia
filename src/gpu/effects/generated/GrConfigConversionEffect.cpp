@@ -28,7 +28,7 @@ public:
         (void)pmConversion;
 
         fragBuilder->forceHighPrecision();
-        SkString _sample5748 = this->invokeChild(0, args);
+        SkString _sample5768 = this->invokeChild(0, args);
         fragBuilder->codeAppendf(
                 R"SkSL(%s = floor(%s * 255.0 + 0.5) / 255.0;
 @switch (%d) {
@@ -40,7 +40,7 @@ public:
         break;
 }
 )SkSL",
-                args.fOutputColor, _sample5748.c_str(), (int)_outer.pmConversion, args.fOutputColor,
+                args.fOutputColor, _sample5768.c_str(), (int)_outer.pmConversion, args.fOutputColor,
                 args.fOutputColor, args.fOutputColor, args.fOutputColor, args.fOutputColor,
                 args.fOutputColor, args.fOutputColor);
     }
@@ -62,6 +62,7 @@ bool GrConfigConversionEffect::onIsEqual(const GrFragmentProcessor& other) const
     if (pmConversion != that.pmConversion) return false;
     return true;
 }
+bool GrConfigConversionEffect::usesExplicitReturn() const { return false; }
 GrConfigConversionEffect::GrConfigConversionEffect(const GrConfigConversionEffect& src)
         : INHERITED(kGrConfigConversionEffect_ClassID, src.optimizationFlags())
         , pmConversion(src.pmConversion) {
@@ -70,6 +71,11 @@ GrConfigConversionEffect::GrConfigConversionEffect(const GrConfigConversionEffec
 std::unique_ptr<GrFragmentProcessor> GrConfigConversionEffect::clone() const {
     return std::make_unique<GrConfigConversionEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrConfigConversionEffect::onDumpInfo() const {
+    return SkStringPrintf("(pmConversion=%d)", (int)pmConversion);
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrConfigConversionEffect);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrConfigConversionEffect::TestCreate(
@@ -81,7 +87,7 @@ std::unique_ptr<GrFragmentProcessor> GrConfigConversionEffect::TestCreate(
 }
 #endif
 
-bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* context) {
+bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* dContext) {
     static constexpr int kSize = 256;
     static constexpr GrColorType kColorType = GrColorType::kRGBA_8888;
     SkAutoTMalloc<uint32_t> data(kSize * kSize * 3);
@@ -107,9 +113,9 @@ bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* c
     const SkImageInfo ii =
             SkImageInfo::Make(kSize, kSize, kRGBA_8888_SkColorType, kPremul_SkAlphaType);
 
-    auto readRTC = GrRenderTargetContext::Make(context, kColorType, nullptr, SkBackingFit::kExact,
+    auto readRTC = GrRenderTargetContext::Make(dContext, kColorType, nullptr, SkBackingFit::kExact,
                                                {kSize, kSize});
-    auto tempRTC = GrRenderTargetContext::Make(context, kColorType, nullptr, SkBackingFit::kExact,
+    auto tempRTC = GrRenderTargetContext::Make(dContext, kColorType, nullptr, SkBackingFit::kExact,
                                                {kSize, kSize});
     if (!readRTC || !readRTC->asTextureProxy() || !tempRTC) {
         return false;
@@ -118,14 +124,14 @@ bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* c
     // draw
     readRTC->discard();
 
-    // This function is only ever called if we are in a GrContext that has a GrGpu since we are
+    // This function is only ever called if we are in a GrDirectContext since we are
     // calling read pixels here. Thus the pixel data will be uploaded immediately and we don't
     // need to keep the pixel data alive in the proxy. Therefore the ReleaseProc is nullptr.
     SkBitmap bitmap;
     bitmap.installPixels(ii, srcData, 4 * kSize);
     bitmap.setImmutable();
 
-    GrBitmapTextureMaker maker(context, bitmap, GrImageTexGenPolicy::kNew_Uncached_Budgeted);
+    GrBitmapTextureMaker maker(dContext, bitmap, GrImageTexGenPolicy::kNew_Uncached_Budgeted);
     auto dataView = maker.view(GrMipmapped::kNo);
     if (!dataView) {
         return false;
@@ -144,7 +150,7 @@ bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* c
     paint1.setPorterDuffXPFactory(SkBlendMode::kSrc);
 
     readRTC->fillRectToRect(nullptr, std::move(paint1), GrAA::kNo, SkMatrix::I(), kRect, kRect);
-    if (!readRTC->readPixels(ii, firstRead, 0, {0, 0})) {
+    if (!readRTC->readPixels(dContext, ii, firstRead, 0, {0, 0})) {
         return false;
     }
 
@@ -168,7 +174,7 @@ bool GrConfigConversionEffect::TestForPreservingPMConversions(GrDirectContext* c
 
     readRTC->fillRectToRect(nullptr, std::move(paint3), GrAA::kNo, SkMatrix::I(), kRect, kRect);
 
-    if (!readRTC->readPixels(ii, secondRead, 0, {0, 0})) {
+    if (!readRTC->readPixels(dContext, ii, secondRead, 0, {0, 0})) {
         return false;
     }
 

@@ -15,6 +15,7 @@
 #include "include/core/SkVertices.h"
 #include "include/private/SkColorData.h"
 #include "include/private/SkIDChangeListener.h"
+#include "include/private/SkTPin.h"
 #include "include/utils/SkRandom.h"
 #include "src/core/SkBlurMask.h"
 #include "src/core/SkColorFilterBase.h"
@@ -74,7 +75,7 @@ protected:
 private:
     SK_FLATTENABLE_HOOKS(SkGaussianColorFilter)
 
-    typedef SkColorFilterBase INHERITED;
+    using INHERITED = SkColorFilterBase;
 };
 
 sk_sp<SkFlattenable> SkGaussianColorFilter::CreateProc(SkReadBuffer&) {
@@ -492,7 +493,7 @@ bool draw_shadow(const FACTORY& factory,
 
     return true;
 }
-}
+}  // namespace
 
 static bool tilted(const SkPoint3& zPlaneParams) {
     return !SkScalarNearlyZero(zPlaneParams.fX) || !SkScalarNearlyZero(zPlaneParams.fY);

@@ -12,7 +12,7 @@
 #include "include/gpu/mtl/GrMtlTypes.h"
 #include "src/core/SkMathPriv.h"
 #include "src/gpu/GrCaps.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/image/SkImage_Base.h"
 #include "tools/sk_app/MetalWindowContext.h"
 
@@ -88,15 +88,16 @@ sk_sp<SkSurface> MetalWindowContext::getBackbufferSurface() {
 }
 
 void MetalWindowContext::swapBuffers() {
-    // ARC is off in sk_app, so we need to release the CF ref manually
     id<CAMetalDrawable> currentDrawable = (id<CAMetalDrawable>)fDrawableHandle;
-    CFRelease(fDrawableHandle);
 
     id<MTLCommandBuffer> commandBuffer = [fQueue commandBuffer];
     commandBuffer.label = @"Present";
 
     [commandBuffer presentDrawable:currentDrawable];
     [commandBuffer commit];
+    // ARC is off in sk_app, so we need to release the CF ref manually
+    CFRelease(fDrawableHandle);
+    fDrawableHandle = nil;
 }
 
 void MetalWindowContext::setDisplayParams(const DisplayParams& params) {

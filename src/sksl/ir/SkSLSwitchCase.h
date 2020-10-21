@@ -17,31 +17,22 @@ namespace SkSL {
  * A single case of a 'switch' statement.
  */
 struct SwitchCase : public Statement {
-    SwitchCase(int offset, std::unique_ptr<Expression> value,
-               std::vector<std::unique_ptr<Statement>> statements)
-    : INHERITED(offset, kSwitch_Kind)
-    , fValue(std::move(value))
-    , fStatements(std::move(statements)) {}
+    static constexpr Kind kStatementKind = Kind::kSwitchCase;
 
-    int nodeCount() const override {
-        int result = 1;
-        if (fValue) {
-            result += fValue->nodeCount();
-        }
-        for (const auto& s : fStatements) {
-            result += s->nodeCount();
-        }
-        return result;
-    }
+    SwitchCase(int offset, std::unique_ptr<Expression> value, StatementArray statements)
+            : INHERITED(offset, kStatementKind)
+            , fValue(std::move(value))
+            , fStatements(std::move(statements)) {}
 
     std::unique_ptr<Statement> clone() const override {
-        std::vector<std::unique_ptr<Statement>> cloned;
+        StatementArray cloned;
+        cloned.reserve_back(fStatements.size());
         for (const auto& s : fStatements) {
             cloned.push_back(s->clone());
         }
-        return std::unique_ptr<Statement>(new SwitchCase(fOffset,
-                                                         fValue ? fValue->clone() : nullptr,
-                                                         std::move(cloned)));
+        return std::make_unique<SwitchCase>(fOffset,
+                                            fValue ? fValue->clone() : nullptr,
+                                            std::move(cloned));
     }
 
     String description() const override {
@@ -59,11 +50,11 @@ struct SwitchCase : public Statement {
 
     // null value implies "default" case
     std::unique_ptr<Expression> fValue;
-    std::vector<std::unique_ptr<Statement>> fStatements;
+    StatementArray fStatements;
 
-    typedef Statement INHERITED;
+    using INHERITED = Statement;
 };
 
-} // namespace
+}  // namespace SkSL
 
 #endif

@@ -9,13 +9,14 @@
 #include "tests/Test.h"
 
 #include "include/core/SkMatrix.h"
+#include "include/core/SkPathBuilder.h"
 #include "include/core/SkRect.h"
 #include "include/gpu/GrDirectContext.h"
 #include "include/gpu/GrRecordingContext.h"
 #include "include/gpu/mock/GrMockTypes.h"
 #include "src/core/SkPathPriv.h"
 #include "src/gpu/GrClip.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrDrawingManager.h"
 #include "src/gpu/GrPaint.h"
 #include "src/gpu/GrPathRenderer.h"
@@ -266,10 +267,11 @@ class CCPR_parseEmptyPath : public CCPRTest {
 
         // Make a path large enough that ccpr chooses to crop it by the RT bounds, and ends up with
         // an empty path.
-        SkPath largeOutsidePath;
-        largeOutsidePath.moveTo(-1e30f, -1e30f);
-        largeOutsidePath.lineTo(-1e30f, +1e30f);
-        largeOutsidePath.lineTo(-1e10f, +1e30f);
+        SkPath largeOutsidePath = SkPath::Polygon({
+            {-1e30f, -1e30f},
+            {-1e30f, +1e30f},
+            {-1e10f, +1e30f},
+        }, false);
         ccpr.drawPath(largeOutsidePath);
 
         // Normally an empty path is culled before reaching ccpr, however we use a back door for
@@ -892,14 +894,14 @@ class CCPR_busyPath : public CCPRRenderingTest {
     void onRun(skiatest::Reporter* reporter, const CCPRPathDrawer& ccpr) const override {
         static constexpr int kNumBusyVerbs = 1 << 17;
         ccpr.clear();
-        SkPath busyPath;
+        SkPathBuilder busyPath;
         busyPath.moveTo(0, 0); // top left
         busyPath.lineTo(kCanvasSize, kCanvasSize); // bottom right
         for (int i = 2; i < kNumBusyVerbs; ++i) {
             float offset = i * ((float)kCanvasSize / kNumBusyVerbs);
             busyPath.lineTo(kCanvasSize - offset, kCanvasSize + offset); // offscreen
         }
-        ccpr.drawPath(busyPath);
+        ccpr.drawPath(busyPath.detach());
 
         ccpr.flush(); // If this doesn't crash, the test passed.
                       // If it does, maybe fiddle with fMaxInstancesPerDrawArraysWithoutCrashing in
@@ -907,3 +909,38 @@ class CCPR_busyPath : public CCPRRenderingTest {
     }
 };
 DEF_CCPR_RENDERING_TEST(CCPR_busyPath)
+
+// https://bugs.chromium.org/p/chromium/issues/detail?id=1102117
+class CCPR_evictCacheEntryForPendingDrawOp : public CCPRRenderingTest {
+    void onRun(skiatest::Reporter* reporter, const CCPRPathDrawer& ccpr) const override {
+        static constexpr SkRect kRect = SkRect::MakeWH(50, 50);
+        ccpr.clear();
+
+        // make sure path is cached.
+        for (int i = 0; i < 2; i++) {
+            SkPath path;
+            path.addRect(kRect);
+
+            ccpr.drawPath(path);
+            ccpr.flush();
+        }
+
+        // make enough cached draws to make DoCopies happen.
+        for (int i = 0; i <= GrCoverageCountingPathRenderer::kDoCopiesThreshold; i++) {
+            SkPath path;
+            path.addRect(kRect);
+            ccpr.drawPath(path);
+        }
+
+        // now draw the path in an incompatible matrix. Previous draw's cached atlas should
+        // not be invalidated. otherwise, this flush would render more paths than allocated for.
+        auto m = SkMatrix::Translate(0.1f, 0.1f);
+        SkPath path;
+        path.addRect(kRect);
+        ccpr.drawPath(path, m);
+        ccpr.flush();
+
+        // if this test does not crash, it is passed.
+    }
+};
+DEF_CCPR_RENDERING_TEST(CCPR_evictCacheEntryForPendingDrawOp)

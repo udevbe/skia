@@ -24,7 +24,7 @@ class GrD3DConstantRingBuffer;
 class GrD3DPipelineState;
 class GrD3DRenderTarget;
 class GrD3DRootSignature;
-class GrD3DStencilAttachment;
+class GrD3DAttachment;
 class GrD3DTexture;
 class GrD3DTextureResource;
 
@@ -157,6 +157,8 @@ public:
     void setPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY primitiveTopology);
     void setScissorRects(unsigned int numRects, const D3D12_RECT* rects);
     void setViewports(unsigned int numViewports, const D3D12_VIEWPORT* viewports);
+    void setCenteredSamplePositions(unsigned int numSamples);
+    void setDefaultSamplePositions();
     void setGraphicsRootSignature(const sk_sp<GrD3DRootSignature>& rootSignature);
     void setVertexBuffers(unsigned int startSlot,
                           sk_sp<const GrBuffer> vertexBuffer, size_t vertexStride,
@@ -172,7 +174,8 @@ public:
 
     void clearRenderTargetView(const GrD3DRenderTarget* renderTarget, const SkPMColor4f& color,
                                const D3D12_RECT* rect);
-    void clearDepthStencilView(const GrD3DStencilAttachment*, uint8_t stencilClearValue,
+    void clearDepthStencilView(const GrD3DAttachment*,
+                               uint8_t stencilClearValue,
                                const D3D12_RECT* rect);
     void setRenderTarget(const GrD3DRenderTarget* renderTarget);
     void resolveSubresourceRegion(const GrD3DTextureResource* dstTexture,
@@ -204,6 +207,7 @@ private:
     const GrBuffer* fCurrentInstanceBuffer;
     size_t fCurrentInstanceStride;
     const GrBuffer* fCurrentIndexBuffer;
+    bool fUsingCenteredSamples;
 
     D3D12_GPU_VIRTUAL_ADDRESS fCurrentConstantBufferAddress;
     D3D12_GPU_DESCRIPTOR_HANDLE fCurrentRootDescriptorTable[GrD3DRootSignature::kParamIndexCount];

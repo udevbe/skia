@@ -10,25 +10,10 @@
 #include "include/core/SkYUVAIndex.h"
 #include "src/core/SkNextID.h"
 
-#if SK_SUPPORT_GPU
-#include "include/gpu/GrDirectContext.h"
-#endif
-
 SkImageGenerator::SkImageGenerator(const SkImageInfo& info, uint32_t uniqueID)
     : fInfo(info)
     , fUniqueID(kNeedNewImageUniqueID == uniqueID ? SkNextID::ImageID() : uniqueID)
 {}
-
-bool SkImageGenerator::isValid(GrContext* context) const {
-#if SK_SUPPORT_GPU
-    return this->isValid(static_cast<GrRecordingContext*>(context));
-#else
-    if (context) {
-        return false;
-    }
-    return this->isValid(static_cast<GrRecordingContext*>(nullptr));
-#endif
-}
 
 bool SkImageGenerator::getPixels(const SkImageInfo& info, void* pixels, size_t rowBytes) {
     if (kUnknown_SkColorType == info.colorType()) {
@@ -45,32 +30,16 @@ bool SkImageGenerator::getPixels(const SkImageInfo& info, void* pixels, size_t r
     return this->onGetPixels(info, pixels, rowBytes, defaultOpts);
 }
 
-bool SkImageGenerator::queryYUVA8(SkYUVASizeInfo* sizeInfo,
-                                  SkYUVAIndex yuvaIndices[SkYUVAIndex::kIndexCount],
-                                  SkYUVColorSpace* colorSpace) const {
-    SkASSERT(sizeInfo);
+bool SkImageGenerator::queryYUVAInfo(const SkYUVAPixmapInfo::SupportedDataTypes& supportedDataTypes,
+                                     SkYUVAPixmapInfo* yuvaPixmapInfo) const {
+    SkASSERT(yuvaPixmapInfo);
 
-    return this->onQueryYUVA8(sizeInfo, yuvaIndices, colorSpace);
+    return this->onQueryYUVAInfo(supportedDataTypes, yuvaPixmapInfo) &&
+           yuvaPixmapInfo->isSupported(supportedDataTypes);
 }
 
-bool SkImageGenerator::getYUVA8Planes(const SkYUVASizeInfo& sizeInfo,
-                                      const SkYUVAIndex yuvaIndices[SkYUVAIndex::kIndexCount],
-                                      void* planes[SkYUVASizeInfo::kMaxCount]) {
-
-    for (int i = 0; i < SkYUVASizeInfo::kMaxCount; ++i) {
-        SkASSERT(sizeInfo.fSizes[i].fWidth >= 0);
-        SkASSERT(sizeInfo.fSizes[i].fHeight >= 0);
-        SkASSERT(sizeInfo.fWidthBytes[i] >= (size_t) sizeInfo.fSizes[i].fWidth);
-    }
-
-    int numPlanes = 0;
-    SkASSERT(SkYUVAIndex::AreValidIndices(yuvaIndices, &numPlanes));
-    SkASSERT(planes);
-    for (int i = 0; i < numPlanes; ++i) {
-        SkASSERT(planes[i]);
-    }
-
-    return this->onGetYUVA8Planes(sizeInfo, yuvaIndices, planes);
+bool SkImageGenerator::getYUVAPlanes(const SkYUVAPixmaps& yuvaPixmaps) {
+    return this->onGetYUVAPlanes(yuvaPixmaps);
 }
 
 #if SK_SUPPORT_GPU

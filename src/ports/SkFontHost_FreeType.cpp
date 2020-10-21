@@ -15,6 +15,7 @@
 #include "include/private/SkColorData.h"
 #include "include/private/SkMalloc.h"
 #include "include/private/SkMutex.h"
+#include "include/private/SkTPin.h"
 #include "include/private/SkTemplates.h"
 #include "include/private/SkTo.h"
 #include "src/core/SkAdvancedTypefaceMetrics.h"
@@ -694,6 +695,23 @@ void SkTypeface_FreeType::getPostScriptGlyphNames(SkString* dstArray) const {
             dstArray[gID] = glyphName;
         }
     }
+}
+
+bool SkTypeface_FreeType::onGetPostScriptName(SkString* skPostScriptName) const {
+    AutoFTAccess fta(this);
+    FT_Face face = fta.face();
+    if (!face) {
+        return false;
+    }
+
+    const char* ftPostScriptName = FT_Get_Postscript_Name(face);
+    if (!ftPostScriptName) {
+        return false;
+    }
+    if (skPostScriptName) {
+        *skPostScriptName = ftPostScriptName;
+    }
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -1489,10 +1507,14 @@ void SkScalerContext_FreeType::generateFontMetrics(SkFontMetrics* metrics) {
         ascent = -SkIntToScalar(face->size->metrics.ascender) / (yppem * 64.0f);
         descent = -SkIntToScalar(face->size->metrics.descender) / (yppem * 64.0f);
         leading = (SkIntToScalar(face->size->metrics.height) / (yppem * 64.0f)) + ascent - descent;
+
         xmin = 0.0f;
         xmax = SkIntToScalar(face->available_sizes[fStrikeIndex].width) / xppem;
         ymin = descent;
         ymax = ascent;
+        // The actual bitmaps may be any size and placed at any offset.
+        metrics->fFlags |= SkFontMetrics::kBoundsInvalid_Flag;
+
         underlineThickness = 0;
         underlinePosition = 0;
         metrics->fFlags &= ~SkFontMetrics::kUnderlineThicknessIsValid_Flag;
@@ -1970,17 +1992,17 @@ bool SkTypeface_FreeType::Scanner::scanFont(
         }
     }
 
-    if (name) {
+    if (name != nullptr) {
         name->set(face->family_name);
     }
-    if (style) {
+    if (style != nullptr) {
         *style = SkFontStyle(weight, width, slant);
     }
-    if (isFixedPitch) {
+    if (isFixedPitch != nullptr) {
         *isFixedPitch = FT_IS_FIXED_WIDTH(face);
     }
 
-    if (axes && !GetAxes(face.get(), axes)) {
+    if (axes != nullptr && !GetAxes(face.get(), axes)) {
         return false;
     }
     return true;

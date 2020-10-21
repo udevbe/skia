@@ -9,7 +9,6 @@
 #include "src/gpu/ops/GrSmallPathRenderer.h"
 
 #include "include/core/SkPaint.h"
-#include "src/core/SkAutoMalloc.h"
 #include "src/core/SkAutoPixmapStorage.h"
 #include "src/core/SkDistanceFieldGen.h"
 #include "src/core/SkDraw.h"
@@ -17,7 +16,6 @@
 #include "src/core/SkMatrixProvider.h"
 #include "src/core/SkPointPriv.h"
 #include "src/core/SkRasterClip.h"
-#include "src/gpu/GrAuditTrail.h"
 #include "src/gpu/GrBuffer.h"
 #include "src/gpu/GrCaps.h"
 #include "src/gpu/GrDistanceFieldGenFromVector.h"
@@ -28,18 +26,11 @@
 #include "src/gpu/effects/GrBitmapTextGeoProc.h"
 #include "src/gpu/effects/GrDistanceFieldGeoProc.h"
 #include "src/gpu/geometry/GrQuad.h"
+#include "src/gpu/geometry/GrStyledShape.h"
 #include "src/gpu/ops/GrMeshDrawOp.h"
 #include "src/gpu/ops/GrSimpleMeshDrawOpHelperWithStencil.h"
+#include "src/gpu/ops/GrSmallPathAtlasMgr.h"
 #include "src/gpu/ops/GrSmallPathShapeData.h"
-
-static constexpr size_t kMaxAtlasTextureBytes = 2048 * 2048;
-static constexpr size_t kPlotWidth = 512;
-static constexpr size_t kPlotHeight = 256;
-
-#ifdef DF_PATH_TRACKING
-static int g_NumCachedShapes = 0;
-static int g_NumFreedShapes = 0;
-#endif
 
 // mip levels
 static constexpr SkScalar kIdealMinMIP = 12;
@@ -49,58 +40,10 @@ static constexpr SkScalar kMaxDim = 73;
 static constexpr SkScalar kMinSize = SK_ScalarHalf;
 static constexpr SkScalar kMaxSize = 2*kMaxMIP;
 
-namespace GrSmallPathAtlasMgr {
+GrSmallPathRenderer::GrSmallPathRenderer() {}
 
-static const GrSurfaceProxyView* GetViews(GrDrawOpAtlas* atlas, int* numActiveProxies) {
-    *numActiveProxies = atlas->numActivePages();
-    return atlas->getViews();
-}
+GrSmallPathRenderer::~GrSmallPathRenderer() {}
 
-static void SetUseToken(GrDrawOpAtlas* atlas,
-                        GrSmallPathShapeData* shapeData,
-                        GrDeferredUploadToken token) {
-     atlas->setLastUseToken(shapeData->fAtlasLocator, token);
-}
-
-} // GrSmallPathAtlasMgr
-
-// Callback to clear out internal path cache when eviction occurs
-void GrSmallPathRenderer::evict(GrDrawOpAtlas::PlotLocator plotLocator) {
-    // remove any paths that use this plot
-    ShapeDataList::Iter iter;
-    iter.init(fShapeList, ShapeDataList::Iter::kHead_IterStart);
-    GrSmallPathShapeData* shapeData;
-    while ((shapeData = iter.get())) {
-        iter.next();
-        if (plotLocator == shapeData->fAtlasLocator.plotLocator()) {
-            fShapeCache.remove(shapeData->fKey);
-            fShapeList.remove(shapeData);
-            delete shapeData;
-#ifdef DF_PATH_TRACKING
-            ++g_NumFreedPaths;
-#endif
-        }
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-GrSmallPathRenderer::GrSmallPathRenderer() : fAtlas(nullptr) {}
-
-GrSmallPathRenderer::~GrSmallPathRenderer() {
-    ShapeDataList::Iter iter;
-    iter.init(fShapeList, ShapeDataList::Iter::kHead_IterStart);
-    GrSmallPathShapeData* shapeData;
-    while ((shapeData = iter.get())) {
-        iter.next();
-        delete shapeData;
-    }
-
-#ifdef DF_PATH_TRACKING
-    SkDebugf("Cached shapes: %d, freed shapes: %d\n", g_NumCachedShapes, g_NumFreedShapes);
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
 GrPathRenderer::CanDrawPath GrSmallPathRenderer::onCanDrawPath(const CanDrawPathArgs& args) const {
     if (!args.fCaps->shaderCaps()->shaderDerivativeSupport()) {
         return CanDrawPath::kNo;
@@ -154,26 +97,18 @@ private:
 public:
     DEFINE_OP_CLASS_ID
 
-    using ShapeCache = SkTDynamicHash<GrSmallPathShapeData, GrSmallPathShapeDataKey>;
-    using ShapeDataList = GrSmallPathRenderer::ShapeDataList;
-
     static std::unique_ptr<GrDrawOp> Make(GrRecordingContext* context,
                                           GrPaint&& paint,
                                           const GrStyledShape& shape,
                                           const SkMatrix& viewMatrix,
-                                          GrDrawOpAtlas* atlas,
-                                          ShapeCache* shapeCache,
-                                          ShapeDataList* shapeList,
                                           bool gammaCorrect,
                                           const GrUserStencilSettings* stencilSettings) {
         return Helper::FactoryHelper<SmallPathOp>(context, std::move(paint), shape, viewMatrix,
-                                                  atlas, shapeCache, shapeList, gammaCorrect,
-                                                  stencilSettings);
+                                                  gammaCorrect, stencilSettings);
     }
 
     SmallPathOp(Helper::MakeArgs helperArgs, const SkPMColor4f& color, const GrStyledShape& shape,
-                const SkMatrix& viewMatrix, GrDrawOpAtlas* atlas, ShapeCache* shapeCache,
-                ShapeDataList* shapeList, bool gammaCorrect,
+                const SkMatrix& viewMatrix, bool gammaCorrect,
                 const GrUserStencilSettings* stencilSettings)
             : INHERITED(ClassID())
             , fHelper(helperArgs, GrAAType::kCoverage, stencilSettings) {
@@ -192,9 +127,6 @@ public:
 
         fShapes.emplace_back(Entry{color, shape, viewMatrix});
 
-        fAtlas = atlas;
-        fShapeCache = shapeCache;
-        fShapeList = shapeList;
         fGammaCorrect = gammaCorrect;
     }
 
@@ -203,18 +135,6 @@ public:
     void visitProxies(const VisitProxyFunc& func) const override {
         fHelper.visitProxies(func);
     }
-
-#ifdef SK_DEBUG
-    SkString dumpInfo() const override {
-        SkString string;
-        for (const auto& geo : fShapes) {
-            string.appendf("Color: 0x%08x\n", geo.fColor.toBytes_RGBA());
-        }
-        string += fHelper.dumpInfo();
-        string += INHERITED::dumpInfo();
-        return string;
-    }
-#endif
 
     FixedFunctionFlags fixedFunctionFlags() const override { return fHelper.fixedFunctionFlags(); }
 
@@ -245,19 +165,28 @@ private:
                              SkArenaAlloc*,
                              const GrSurfaceProxyView* writeView,
                              GrAppliedClip&&,
-                             const GrXferProcessor::DstProxyView&) override {
-        // TODO [PI]: implement
+                             const GrXferProcessor::DstProxyView&,
+                             GrXferBarrierFlags renderPassXferBarriers) override {
+        // We cannot surface the SmallPathOp's programInfo at record time. As currently
+        // implemented, the GP is modified at flush time based on the number of pages in the
+        // atlas.
     }
 
     void onPrePrepareDraws(GrRecordingContext*,
                            const GrSurfaceProxyView* writeView,
                            GrAppliedClip*,
-                           const GrXferProcessor::DstProxyView&) override {
+                           const GrXferProcessor::DstProxyView&,
+                           GrXferBarrierFlags renderPassXferBarriers) override {
         // TODO [PI]: implement
     }
 
     void onPrepareDraws(Target* target) override {
         int instanceCount = fShapes.count();
+
+        GrSmallPathAtlasMgr* atlasMgr = target->smallPathAtlasManager();
+        if (!atlasMgr) {
+            return;
+        }
 
         static constexpr int kMaxTextures = GrDistanceFieldPathGeoProc::kMaxTextures;
         static_assert(GrBitmapTextGeoProc::kMaxTextures == kMaxTextures);
@@ -266,7 +195,7 @@ private:
         flushInfo.fPrimProcProxies = target->allocPrimProcProxyPtrs(kMaxTextures);
 
         int numActiveProxies;
-        const GrSurfaceProxyView* views = GrSmallPathAtlasMgr::GetViews(fAtlas, &numActiveProxies);
+        const GrSurfaceProxyView* views = atlasMgr->getViews(&numActiveProxies);
         for (int i = 0; i < numActiveProxies; ++i) {
             // This op does not know its atlas proxies when it is added to a GrOpsTasks, so the
             // proxies don't get added during the visitProxies call. Thus we add them here.
@@ -379,60 +308,44 @@ private:
                     }
                     mipSize = newMipSize;
                 }
+
                 SkScalar desiredDimension = std::min(mipSize, kMaxMIP);
+                int ceilDesiredDimension = SkScalarCeilToInt(desiredDimension);
 
                 // check to see if df path is cached
-                GrSmallPathShapeDataKey key(args.fShape, SkScalarCeilToInt(desiredDimension));
-                shapeData = fShapeCache->find(key);
-                if (!shapeData || !fAtlas->hasID(shapeData->fAtlasLocator.plotLocator())) {
-                    // Remove the stale cache entry
-                    if (shapeData) {
-                        fShapeCache->remove(shapeData->fKey);
-                        fShapeList->remove(shapeData);
-                        delete shapeData;
-                    }
+                shapeData = atlasMgr->findOrCreate(args.fShape, ceilDesiredDimension);
+                if (!shapeData->fAtlasLocator.plotLocator().isValid()) {
                     SkScalar scale = desiredDimension / maxDim;
 
-                    shapeData = new GrSmallPathShapeData;
                     if (!this->addDFPathToAtlas(target,
                                                 &flushInfo,
-                                                fAtlas,
+                                                atlasMgr,
                                                 shapeData,
                                                 args.fShape,
-                                                SkScalarCeilToInt(desiredDimension),
+                                                ceilDesiredDimension,
                                                 scale)) {
-                        delete shapeData;
+                        atlasMgr->deleteCacheEntry(shapeData);
                         continue;
                     }
                 }
             } else {
                 // check to see if bitmap path is cached
-                GrSmallPathShapeDataKey key(args.fShape, args.fViewMatrix);
-                shapeData = fShapeCache->find(key);
-                if (!shapeData || !fAtlas->hasID(shapeData->fAtlasLocator.plotLocator())) {
-                    // Remove the stale cache entry
-                    if (shapeData) {
-                        fShapeCache->remove(shapeData->fKey);
-                        fShapeList->remove(shapeData);
-                        delete shapeData;
-                    }
-
-                    shapeData = new GrSmallPathShapeData;
+                shapeData = atlasMgr->findOrCreate(args.fShape, args.fViewMatrix);
+                if (!shapeData->fAtlasLocator.plotLocator().isValid()) {
                     if (!this->addBMPathToAtlas(target,
                                                 &flushInfo,
-                                                fAtlas,
+                                                atlasMgr,
                                                 shapeData,
                                                 args.fShape,
                                                 args.fViewMatrix)) {
-                        delete shapeData;
+                        atlasMgr->deleteCacheEntry(shapeData);
                         continue;
                     }
                 }
             }
 
             auto uploadTarget = target->deferredUploadTarget();
-            GrSmallPathAtlasMgr::SetUseToken(fAtlas, shapeData,
-                                             uploadTarget->tokenTracker()->nextDrawToken());
+            atlasMgr->setUseToken(shapeData, uploadTarget->tokenTracker()->nextDrawToken());
 
             this->writePathVertices(vertices, GrVertexColor(args.fColor, fWideColor),
                                     args.fViewMatrix, shapeData);
@@ -442,14 +355,17 @@ private:
         this->flush(target, &flushInfo);
     }
 
-    bool addToAtlas(GrMeshDrawOp::Target* target, FlushInfo* flushInfo, GrDrawOpAtlas* atlas,
-                    int width, int height, const void* image,
-                    GrDrawOpAtlas::AtlasLocator* atlasLocator) const {
+    bool addToAtlasWithRetry(GrMeshDrawOp::Target* target,
+                             FlushInfo* flushInfo,
+                             GrSmallPathAtlasMgr* atlasMgr,
+                             int width, int height, const void* image,
+                             const SkRect& bounds, int srcInset,
+                             GrSmallPathShapeData* shapeData) const {
         auto resourceProvider = target->resourceProvider();
         auto uploadTarget = target->deferredUploadTarget();
 
-        GrDrawOpAtlas::ErrorCode code = atlas->addToAtlas(resourceProvider, uploadTarget,
-                                                          width, height, image, atlasLocator);
+        auto code = atlasMgr->addToAtlas(resourceProvider, uploadTarget, width, height,
+                                         image, &shapeData->fAtlasLocator);
         if (GrDrawOpAtlas::ErrorCode::kError == code) {
             return false;
         }
@@ -457,15 +373,18 @@ private:
         if (GrDrawOpAtlas::ErrorCode::kTryAgain == code) {
             this->flush(target, flushInfo);
 
-            code = atlas->addToAtlas(resourceProvider, uploadTarget, width, height,
-                                     image, atlasLocator);
+            code = atlasMgr->addToAtlas(resourceProvider, uploadTarget, width, height,
+                                        image, &shapeData->fAtlasLocator);
         }
+
+        shapeData->fAtlasLocator.insetSrc(srcInset);
+        shapeData->fBounds = bounds;
 
         return GrDrawOpAtlas::ErrorCode::kSucceeded == code;
     }
 
     bool addDFPathToAtlas(GrMeshDrawOp::Target* target, FlushInfo* flushInfo,
-                          GrDrawOpAtlas* atlas, GrSmallPathShapeData* shapeData,
+                          GrSmallPathAtlasMgr* atlasMgr, GrSmallPathShapeData* shapeData,
                           const GrStyledShape& shape, uint32_t dimension, SkScalar scale) const {
 
         const SkRect& bounds = shape.bounds();
@@ -513,13 +432,12 @@ private:
         shape.asPath(&path);
         // Generate signed distance field directly from SkPath
         bool succeed = GrGenerateDistanceFieldFromPath((unsigned char*)dfStorage.get(),
-                                        path, drawMatrix,
-                                        width, height, width * sizeof(unsigned char));
+                                                       path, drawMatrix, width, height,
+                                                       width * sizeof(unsigned char));
         if (!succeed) {
             // setup bitmap backing
             SkAutoPixmapStorage dst;
-            if (!dst.tryAlloc(SkImageInfo::MakeA8(devPathBounds.width(),
-                                                  devPathBounds.height()))) {
+            if (!dst.tryAlloc(SkImageInfo::MakeA8(devPathBounds.width(), devPathBounds.height()))) {
                 return false;
             }
             sk_bzero(dst.writable_addr(), dst.computeByteSize());
@@ -546,34 +464,19 @@ private:
                                                dst.width(), dst.height(), dst.rowBytes());
         }
 
-        // add to atlas
-        if (!this->addToAtlas(target, flushInfo, atlas, width, height, dfStorage.get(),
-                              &shapeData->fAtlasLocator)) {
-            return false;
-        }
+        SkRect drawBounds = SkRect::Make(devPathBounds).makeOffset(-translateX, -translateY);
+        drawBounds.fLeft /= scale;
+        drawBounds.fTop /= scale;
+        drawBounds.fRight /= scale;
+        drawBounds.fBottom /= scale;
 
-        shapeData->fAtlasLocator.insetSrc(SK_DistanceFieldPad);
-
-        // add to cache
-        shapeData->fKey.set(shape, dimension);
-
-        shapeData->fBounds = SkRect::Make(devPathBounds);
-        shapeData->fBounds.offset(-translateX, -translateY);
-        shapeData->fBounds.fLeft /= scale;
-        shapeData->fBounds.fTop /= scale;
-        shapeData->fBounds.fRight /= scale;
-        shapeData->fBounds.fBottom /= scale;
-
-        fShapeCache->add(shapeData);
-        fShapeList->addToTail(shapeData);
-#ifdef DF_PATH_TRACKING
-        ++g_NumCachedPaths;
-#endif
-        return true;
+        return this->addToAtlasWithRetry(target, flushInfo, atlasMgr,
+                                         width, height, dfStorage.get(),
+                                         drawBounds, SK_DistanceFieldPad, shapeData);
     }
 
     bool addBMPathToAtlas(GrMeshDrawOp::Target* target, FlushInfo* flushInfo,
-                          GrDrawOpAtlas* atlas, GrSmallPathShapeData* shapeData,
+                          GrSmallPathAtlasMgr* atlasMgr, GrSmallPathShapeData* shapeData,
                           const GrStyledShape& shape, const SkMatrix& ctm) const {
         const SkRect& bounds = shape.bounds();
         if (bounds.isEmpty()) {
@@ -610,8 +513,7 @@ private:
         shape.asPath(&path);
         // setup bitmap backing
         SkAutoPixmapStorage dst;
-        if (!dst.tryAlloc(SkImageInfo::MakeA8(devPathBounds.width(),
-                                              devPathBounds.height()))) {
+        if (!dst.tryAlloc(SkImageInfo::MakeA8(devPathBounds.width(), devPathBounds.height()))) {
             return false;
         }
         sk_bzero(dst.writable_addr(), dst.computeByteSize());
@@ -633,24 +535,11 @@ private:
 
         draw.drawPathCoverage(path, paint);
 
-        // add to atlas
-        if (!this->addToAtlas(target, flushInfo, atlas, dst.width(), dst.height(), dst.addr(),
-                              &shapeData->fAtlasLocator)) {
-            return false;
-        }
+        SkRect drawBounds = SkRect::Make(devPathBounds).makeOffset(-translateX, -translateY);
 
-        // add to cache
-        shapeData->fKey.set(shape, ctm);
-
-        shapeData->fBounds = SkRect::Make(devPathBounds);
-        shapeData->fBounds.offset(-translateX, -translateY);
-
-        fShapeCache->add(shapeData);
-        fShapeList->addToTail(shapeData);
-#ifdef DF_PATH_TRACKING
-        ++g_NumCachedPaths;
-#endif
-        return true;
+        return this->addToAtlasWithRetry(target, flushInfo, atlasMgr,
+                                         dst.width(), dst.height(), dst.addr(),
+                                         drawBounds, 0, shapeData);
     }
 
     void writePathVertices(GrVertexWriter& vertices,
@@ -678,12 +567,15 @@ private:
     }
 
     void flush(GrMeshDrawOp::Target* target, FlushInfo* flushInfo) const {
+        GrSmallPathAtlasMgr* atlasMgr = target->smallPathAtlasManager();
+        if (!atlasMgr) {
+            return;
+        }
 
         int numActiveProxies;
-        const GrSurfaceProxyView* views = GrSmallPathAtlasMgr::GetViews(fAtlas, &numActiveProxies);
+        const GrSurfaceProxyView* views = atlasMgr->getViews(&numActiveProxies);
 
         GrGeometryProcessor* gp = flushInfo->fGeometryProcessor;
-
         if (gp->numTextureSamplers() != numActiveProxies) {
             for (int i = gp->numTextureSamplers(); i < numActiveProxies; ++i) {
                 flushInfo->fPrimProcProxies[i] = views[i].proxy();
@@ -720,9 +612,10 @@ private:
     }
 
     void onExecute(GrOpFlushState* flushState, const SkRect& chainBounds) override {
-        auto pipeline = fHelper.createPipelineWithStencil(flushState);
+        auto pipeline = fHelper.createPipeline(flushState);
 
-        flushState->executeDrawsAndUploadsForMeshDrawOp(this, chainBounds, pipeline);
+        flushState->executeDrawsAndUploadsForMeshDrawOp(this, chainBounds, pipeline,
+                                                        fHelper.stencilSettings());
     }
 
     const SkPMColor4f& color() const { return fShapes[0].fColor; }
@@ -766,6 +659,17 @@ private:
         return CombineResult::kMerged;
     }
 
+#if GR_TEST_UTILS
+    SkString onDumpInfo() const override {
+        SkString string;
+        for (const auto& geo : fShapes) {
+            string.appendf("Color: 0x%08x\n", geo.fColor.toBytes_RGBA());
+        }
+        string += fHelper.dumpInfo();
+        return string;
+    }
+#endif
+
     bool fUsesDistanceField;
 
     struct Entry {
@@ -776,13 +680,10 @@ private:
 
     SkSTArray<1, Entry> fShapes;
     Helper fHelper;
-    GrDrawOpAtlas* fAtlas;
-    ShapeCache* fShapeCache;
-    ShapeDataList* fShapeList;
     bool fGammaCorrect;
     bool fWideColor;
 
-    typedef GrMeshDrawOp INHERITED;
+    using INHERITED = GrMeshDrawOp;
 };
 
 bool GrSmallPathRenderer::onDrawPath(const DrawPathArgs& args) {
@@ -792,25 +693,10 @@ bool GrSmallPathRenderer::onDrawPath(const DrawPathArgs& args) {
     // we've already bailed on inverse filled paths, so this is safe
     SkASSERT(!args.fShape->isEmpty());
     SkASSERT(args.fShape->hasUnstyledKey());
-    if (!fAtlas) {
-        const GrBackendFormat format = args.fContext->priv().caps()->getDefaultBackendFormat(
-                GrColorType::kAlpha_8, GrRenderable::kNo);
-
-        GrDrawOpAtlasConfig atlasConfig(args.fContext->priv().caps()->maxTextureSize(),
-                                        kMaxAtlasTextureBytes);
-        SkISize size = atlasConfig.atlasDimensions(kA8_GrMaskFormat);
-        fAtlas = GrDrawOpAtlas::Make(args.fContext->priv().proxyProvider(), format,
-                                     GrColorType::kAlpha_8, size.width(), size.height(),
-                                     kPlotWidth, kPlotHeight, this,
-                                     GrDrawOpAtlas::AllowMultitexturing::kYes, this);
-        if (!fAtlas) {
-            return false;
-        }
-    }
 
     std::unique_ptr<GrDrawOp> op = SmallPathOp::Make(
-            args.fContext, std::move(args.fPaint), *args.fShape, *args.fViewMatrix, fAtlas.get(),
-            &fShapeCache, &fShapeList, args.fGammaCorrect, args.fUserStencilSettings);
+            args.fContext, std::move(args.fPaint), *args.fShape, *args.fViewMatrix,
+            args.fGammaCorrect, args.fUserStencilSettings);
     args.fRenderTargetContext->addDrawOp(args.fClip, std::move(op));
 
     return true;
@@ -819,82 +705,19 @@ bool GrSmallPathRenderer::onDrawPath(const DrawPathArgs& args) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 #if GR_TEST_UTILS
-
-struct GrSmallPathRenderer::PathTestStruct : public GrDrawOpAtlas::EvictionCallback,
-                                             public GrDrawOpAtlas::GenerationCounter {
-    PathTestStruct() : fContextID(SK_InvalidGenID), fAtlas(nullptr) {}
-    ~PathTestStruct() override { this->reset(); }
-
-    void reset() {
-        ShapeDataList::Iter iter;
-        iter.init(fShapeList, ShapeDataList::Iter::kHead_IterStart);
-        GrSmallPathShapeData* shapeData;
-        while ((shapeData = iter.get())) {
-            iter.next();
-            fShapeList.remove(shapeData);
-            delete shapeData;
-        }
-        fAtlas = nullptr;
-        fShapeCache.reset();
-    }
-
-    void evict(GrDrawOpAtlas::PlotLocator plotLocator) override {
-        // remove any paths that use this plot
-        ShapeDataList::Iter iter;
-        iter.init(fShapeList, ShapeDataList::Iter::kHead_IterStart);
-        GrSmallPathShapeData* shapeData;
-        while ((shapeData = iter.get())) {
-            iter.next();
-            if (plotLocator == shapeData->fAtlasLocator.plotLocator()) {
-                fShapeCache.remove(shapeData->fKey);
-                fShapeList.remove(shapeData);
-                delete shapeData;
-            }
-        }
-    }
-
-    uint32_t fContextID;
-    std::unique_ptr<GrDrawOpAtlas> fAtlas;
-    ShapeCache fShapeCache;
-    ShapeDataList fShapeList;
-};
-
 std::unique_ptr<GrDrawOp> GrSmallPathRenderer::createOp_TestingOnly(
                                                         GrRecordingContext* context,
                                                         GrPaint&& paint,
                                                         const GrStyledShape& shape,
                                                         const SkMatrix& viewMatrix,
-                                                        GrDrawOpAtlas* atlas,
-                                                        ShapeCache* shapeCache,
-                                                        ShapeDataList* shapeList,
                                                         bool gammaCorrect,
                                                         const GrUserStencilSettings* stencil) {
 
     return GrSmallPathRenderer::SmallPathOp::Make(context, std::move(paint), shape, viewMatrix,
-                                                  atlas, shapeCache, shapeList, gammaCorrect,
-                                                  stencil);
-
+                                                  gammaCorrect, stencil);
 }
 
 GR_DRAW_OP_TEST_DEFINE(SmallPathOp) {
-    using PathTestStruct = GrSmallPathRenderer::PathTestStruct;
-    static PathTestStruct gTestStruct;
-
-    if (context->priv().contextID() != gTestStruct.fContextID) {
-        gTestStruct.fContextID = context->priv().contextID();
-        gTestStruct.reset();
-        const GrBackendFormat format = context->priv().caps()->getDefaultBackendFormat(
-                GrColorType::kAlpha_8, GrRenderable::kNo);
-        GrDrawOpAtlasConfig atlasConfig(context->priv().caps()->maxTextureSize(),
-                                        kMaxAtlasTextureBytes);
-        SkISize size = atlasConfig.atlasDimensions(kA8_GrMaskFormat);
-        gTestStruct.fAtlas =
-                GrDrawOpAtlas::Make(context->priv().proxyProvider(), format, GrColorType::kAlpha_8,
-                                    size.width(), size.height(), kPlotWidth, kPlotHeight,
-                                    &gTestStruct,
-                                    GrDrawOpAtlas::AllowMultitexturing::kYes, &gTestStruct);
-    }
-
     SkMatrix viewMatrix = GrTest::TestMatrix(random);
     bool gammaCorrect = random->nextBool();
 
@@ -903,9 +726,6 @@ GR_DRAW_OP_TEST_DEFINE(SmallPathOp) {
     return GrSmallPathRenderer::createOp_TestingOnly(
                                          context,
                                          std::move(paint), shape, viewMatrix,
-                                         gTestStruct.fAtlas.get(),
-                                         &gTestStruct.fShapeCache,
-                                         &gTestStruct.fShapeList,
                                          gammaCorrect,
                                          GrGetRandomStencil(random, context));
 }

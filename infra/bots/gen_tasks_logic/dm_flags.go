@@ -140,7 +140,7 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 		keys = append(keys, "renderer", "skottie")
 	}
 	if b.matchExtraConfig("DDL") {
-		// 'DDL' style means "--skpViewportSize 2048 --pr ~small"
+		// 'DDL' style means "--skpViewportSize 2048"
 		keys = append(keys, "style", "DDL")
 	} else {
 		keys = append(keys, "style", "default")
@@ -334,11 +334,16 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 
 		}
 
-		if b.model("AndroidOne", "GalaxyS6") || (b.model("Nexus5", "Nexus7")) {
+		if b.model("AndroidOne", "GalaxyS6", "Nexus5", "Nexus7") {
 			// skbug.com/9019
 			skip("_ test _ ProcessorCloneTest")
 			skip("_ test _ Programs")
 			skip("_ test _ ProcessorOptimizationValidationTest")
+		}
+
+		if b.model("GalaxyS20") {
+			// skbug.com/10595
+			skip("_ test _ ProcessorCloneTest")
 		}
 
 		if b.extraConfig("CommandBuffer") && b.model("MacBook10.1") {
@@ -386,7 +391,7 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 			}
 		}
 		if b.extraConfig("Direct3D") {
-		        configs = []string{"d3d"}
+			configs = []string{"d3d"}
 		}
 
 		// Test 1010102 on our Linux/NVIDIA bots and the persistent cache config
@@ -463,7 +468,6 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 			// This bot generates comparison images for the large skps and the gms
 			configs = filter(configs, "gl", "vk", "mtl")
 			args = append(args, "--skpViewportSize", "2048")
-			args = append(args, "--pr", "~small")
 		}
 		if b.extraConfig("DDL3") {
 			// This bot generates the real ddl images for the large skps and the gms
@@ -545,6 +549,11 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 		removeFromArgs("skp")
 	} else {
 		removeFromArgs("lottie")
+	}
+
+	if b.extraConfig("TSAN") {
+		// skbug.com/10848
+		removeFromArgs("svg")
 	}
 
 	// TODO: ???
@@ -708,9 +717,9 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 
 	// skia:4095
 	badSerializeGMs := []string{
-		"strict_constraint_batch_no_red_allowed",  // https://crbug.com/skia/10278
-		"strict_constraint_no_red_allowed",        // https://crbug.com/skia/10278
-		"fast_constraint_red_is_allowed",          // https://crbug.com/skia/10278
+		"strict_constraint_batch_no_red_allowed", // https://crbug.com/skia/10278
+		"strict_constraint_no_red_allowed",       // https://crbug.com/skia/10278
+		"fast_constraint_red_is_allowed",         // https://crbug.com/skia/10278
 		"c_gms",
 		"colortype",
 		"colortype_xfermodes",
@@ -886,9 +895,9 @@ func (b *taskBuilder) dmFlags(internalHardwareLabel string) {
 	}
 
 	if b.model("AndroidOne") {
-		match = append(match, "~WritePixels")                       // skia:4711
-		match = append(match, "~PremulAlphaRoundTrip_Gpu")          // skia:7501
-		match = append(match, "~ReimportImageTextureWithMipLevels") // skia:8090
+		match = append(match, "~WritePixels")                             // skia:4711
+		match = append(match, "~PremulAlphaRoundTrip_Gpu")                // skia:7501
+		match = append(match, "~ReimportImageTextureWithMipLevels")       // skia:8090
 		match = append(match, "~MorphologyFilterRadiusWithMirrorCTM_Gpu") // skia:10383
 	}
 

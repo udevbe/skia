@@ -165,9 +165,7 @@
     #define SK_ARM_HAS_NEON
 #endif
 
-// Really this __APPLE__ check shouldn't be necessary, but it seems that Apple's Clang defines
-// __ARM_FEATURE_CRC32 for -arch arm64, even though their chips don't support those instructions!
-#if defined(__ARM_FEATURE_CRC32) && !defined(__APPLE__)
+#if defined(__ARM_FEATURE_CRC32)
     #define SK_ARM_HAS_CRC32
 #endif
 
@@ -422,6 +420,10 @@
 #define SK_API_AVAILABLE(...)
 #endif
 
+#if defined(SK_BUILD_FOR_LIBFUZZER) || defined(SK_BUILD_FOR_AFL_FUZZ)
+    #define SK_BUILD_FOR_FUZZER
+#endif
+
 /** Called internally if we hit an unrecoverable error.
     The platform implementation must not return, but should either throw
     an exception or otherwise exit.
@@ -430,6 +432,9 @@
 
 #ifndef SkDebugf
     SK_API void SkDebugf(const char format[], ...);
+#endif
+#if defined(SK_BUILD_FOR_LIBFUZZER)
+    SK_API inline void SkDebugf(const char format[], ...) {}
 #endif
 
 // SkASSERT, SkASSERTF and SkASSERT_RELEASE can be used as stand alone assertion expressions, e.g.
@@ -483,7 +488,9 @@ typedef unsigned U16CPU;
 
 /** @return false or true based on the condition
 */
-template <typename T> static constexpr bool SkToBool(const T& x) { return 0 != x; }
+template <typename T> static constexpr bool SkToBool(const T& x) {
+    return 0 != x;  // NOLINT(modernize-use-nullptr)
+}
 
 static constexpr int16_t SK_MaxS16 = INT16_MAX;
 static constexpr int16_t SK_MinS16 = -SK_MaxS16;
@@ -572,15 +579,6 @@ template <typename T> static inline T SkTAbs(T value) {
         value = -value;
     }
     return value;
-}
-
-/** @return value pinned (clamped) between min and max, inclusively.
-
-    NOTE: Unlike std::clamp, SkTPin has well-defined behavior if 'value' is a
-          floating point NaN. In that case, 'max' is returned.
-*/
-template <typename T> static constexpr const T& SkTPin(const T& value, const T& min, const T& max) {
-    return value < min ? min : (value < max ? value : max);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

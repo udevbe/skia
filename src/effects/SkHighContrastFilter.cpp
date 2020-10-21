@@ -8,6 +8,7 @@
 #include "include/core/SkString.h"
 #include "include/effects/SkHighContrastFilter.h"
 #include "include/private/SkColorData.h"
+#include "include/private/SkTPin.h"
 #include "src/core/SkArenaAlloc.h"
 #include "src/core/SkColorFilterBase.h"
 #include "src/core/SkColorSpacePriv.h"
@@ -57,7 +58,7 @@ private:
 
     friend class SkHighContrastFilter;
 
-    typedef SkColorFilter INHERITED;
+    using INHERITED = SkColorFilter;
 };
 
 bool SkHighContrast_Filter::onAppendStages(const SkStageRec& rec, bool shaderIsOpaque) const {

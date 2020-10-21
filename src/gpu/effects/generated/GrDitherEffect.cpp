@@ -68,6 +68,7 @@ bool GrDitherEffect::onIsEqual(const GrFragmentProcessor& other) const {
     if (range != that.range) return false;
     return true;
 }
+bool GrDitherEffect::usesExplicitReturn() const { return false; }
 GrDitherEffect::GrDitherEffect(const GrDitherEffect& src)
         : INHERITED(kGrDitherEffect_ClassID, src.optimizationFlags()), range(src.range) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -75,10 +76,13 @@ GrDitherEffect::GrDitherEffect(const GrDitherEffect& src)
 std::unique_ptr<GrFragmentProcessor> GrDitherEffect::clone() const {
     return std::make_unique<GrDitherEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrDitherEffect::onDumpInfo() const { return SkStringPrintf("(range=%f)", range); }
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrDitherEffect);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrDitherEffect::TestCreate(GrProcessorTestData* d) {
-    float range = d->fRandom->nextRangeF(0.0, 1.0);
+    float range = 1.0f - d->fRandom->nextRangeF(0.0f, 1.0f);
     return GrDitherEffect::Make(GrProcessorUnitTest::MakeChildFP(d), range);
 }
 #endif

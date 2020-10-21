@@ -52,7 +52,7 @@ protected:
 private:
     static const int kNumInputs = 5;
 
-    typedef Benchmark INHERITED;
+    using INHERITED = Benchmark;
 };
 
 class ImageMakeWithFilterDAGBench : public Benchmark {
@@ -100,7 +100,7 @@ private:
     static const int kNumInputs = 5;
     sk_sp<SkImage> fImage;
 
-    typedef Benchmark INHERITED;
+    using INHERITED = Benchmark;
 };
 
 // Exercise a blur filter connected to both inputs of an SkDisplacementMapEffect.
@@ -132,7 +132,7 @@ protected:
     }
 
 private:
-    typedef Benchmark INHERITED;
+    using INHERITED = Benchmark;
 };
 
 // Exercise an Xfermode kSrcIn filter compositing two inputs which have a small intersection.
@@ -149,7 +149,7 @@ protected:
         auto offset1 = SkImageFilters::Offset(100.0f, 100.0f, blur);
         auto offset2 = SkImageFilters::Offset(-100.0f, -100.0f, blur);
         auto xfermode =
-                SkImageFilters::Xfermode(SkBlendMode::kSrcIn, offset1, offset2, nullptr);
+                SkImageFilters::Blend(SkBlendMode::kSrcIn, offset1, offset2, nullptr);
 
         SkPaint paint;
         paint.setImageFilter(xfermode);
@@ -161,7 +161,7 @@ protected:
     }
 
 private:
-    typedef Benchmark INHERITED;
+    using INHERITED = Benchmark;
 };
 
 DEF_BENCH(return new ImageFilterDAGBench;)

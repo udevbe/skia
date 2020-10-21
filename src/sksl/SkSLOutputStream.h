@@ -37,7 +37,7 @@ public:
 
     virtual void write(const void* s, size_t size) = 0;
 
-    void writeString(String s);
+    void writeString(const String& s);
 
     void printf(const char format[], ...) SKSL_PRINTF_LIKE(2, 3);
 
@@ -49,6 +49,6 @@ private:
     static const int kBufferSize = 1024;
 };
 
-} // namespace
+}  // namespace SkSL
 
 #endif

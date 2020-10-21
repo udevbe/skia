@@ -9,7 +9,7 @@
 #include "include/effects/SkGradientShader.h"
 #include "src/core/SkMatrixProvider.h"
 #include "src/gpu/GrBitmapTextureMaker.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrRenderTargetContextPriv.h"
 #include "src/gpu/glsl/GrGLSLFragmentShaderBuilder.h"
 #include "src/gpu/ops/GrFillRectOp.h"
@@ -40,7 +40,7 @@ public:
 
 private:
     GrGLSLFragmentProcessor* onCreateGLSLInstance() const override;
-    typedef GrFragmentProcessor INHERITED;
+    using INHERITED = GrFragmentProcessor;
 };
 
 class GLSLSampleMatrixConstantEffect : public GrGLSLFragmentProcessor {

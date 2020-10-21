@@ -12,7 +12,8 @@
 #include "src/core/SkCachedData.h"
 #include "src/image/SkImage_GpuBase.h"
 
-class GrContext;
+class GrDirectContext;
+class GrRecordingContext;
 class GrTexture;
 struct SkYUVASizeInfo;
 
@@ -24,14 +25,13 @@ class SkImage_GpuYUVA : public SkImage_GpuBase {
 public:
     friend class GrYUVAImageTextureMaker;
 
-    SkImage_GpuYUVA(sk_sp<GrRecordingContext>,
+    SkImage_GpuYUVA(sk_sp<GrImageContext>,
                     SkISize size,
                     uint32_t uniqueID,
                     SkYUVColorSpace,
                     GrSurfaceProxyView views[],
                     int numViews,
                     const SkYUVAIndex[4],
-                    GrSurfaceOrigin,
                     sk_sp<SkColorSpace>);
 
     GrSemaphoresSubmitted onFlush(GrDirectContext*, const GrFlushInfo&) override;
@@ -52,7 +52,7 @@ public:
 
     sk_sp<SkImage> onReinterpretColorSpace(sk_sp<SkColorSpace>) const final;
 
-    virtual bool isYUVA() const override { return true; }
+    bool isYUVA() const override { return true; }
 
     bool setupMipmapsForPlanes(GrRecordingContext*) const;
 
@@ -77,7 +77,7 @@ public:
                                                  const SkYUVAIndex yuvaIndices[4],
                                                  int width,
                                                  int height,
-                                                 GrSurfaceOrigin imageOrigin,
+                                                 GrSurfaceOrigin textureOrigin,
                                                  sk_sp<SkColorSpace> imageColorSpace,
                                                  PromiseImageTextureFulfillProc textureFulfillProc,
                                                  PromiseImageTextureReleaseProc textureReleaseProc,
@@ -86,7 +86,7 @@ public:
                                                  PromiseImageApiVersion);
 
 private:
-    SkImage_GpuYUVA(sk_sp<GrContext>, const SkImage_GpuYUVA* image, sk_sp<SkColorSpace>);
+    SkImage_GpuYUVA(sk_sp<GrImageContext>, const SkImage_GpuYUVA* image, sk_sp<SkColorSpace>);
 
     void flattenToRGB(GrRecordingContext*) const;
 
@@ -96,7 +96,7 @@ private:
     int                              fNumViews;
     SkYUVAIndex                      fYUVAIndices[4];
     const SkYUVColorSpace            fYUVColorSpace;
-    GrSurfaceOrigin                  fOrigin;
+
     // If this is non-null then the planar data should be converted from fFromColorSpace to
     // this->colorSpace(). Otherwise we assume the planar data (post YUV->RGB conversion) is already
     // in this->colorSpace().
@@ -111,7 +111,7 @@ private:
     // using the separate YUVA planes. From thence forth we will only use the
     // the RGBView.
     mutable GrSurfaceProxyView       fRGBView;
-    typedef SkImage_GpuBase INHERITED;
+    using INHERITED = SkImage_GpuBase;
 };
 
 #endif

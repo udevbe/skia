@@ -11,7 +11,7 @@
 
 #include "include/gpu/GrBackendSurface.h"
 #include "include/gpu/GrDirectContext.h"
-#include "src/gpu/GrContextPriv.h"
+#include "src/gpu/GrDirectContextPriv.h"
 #include "src/gpu/GrGpu.h"
 #include "src/gpu/GrProxyProvider.h"
 #include "src/gpu/GrRenderTarget.h"
@@ -25,8 +25,7 @@ static sk_sp<GrSurfaceProxy> make_wrapped_rt(GrProxyProvider* provider,
                                              skiatest::Reporter* reporter,
                                              const SkISize& size,
                                              GrColorType colorType) {
-    auto backendRT =
-            gpu->createTestingOnlyBackendRenderTarget(size.width(), size.height(), colorType);
+    auto backendRT = gpu->createTestingOnlyBackendRenderTarget(size, colorType);
     return provider->wrapBackendRenderTarget(backendRT, nullptr);
 }
 

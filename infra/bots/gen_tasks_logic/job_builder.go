@@ -174,6 +174,10 @@ func (b *jobBuilder) genTasksForJob() {
 
 	// Test bots.
 	if b.role("Test") {
+		if b.extraConfig("WasmGMTests") {
+			b.runWasmGMTests()
+			return
+		}
 		b.dm()
 		return
 	}
@@ -208,6 +212,13 @@ func (b *jobBuilder) genTasksForJob() {
 	// Perf bots.
 	if b.role("Perf") {
 		b.perf()
+		return
+	}
+
+	// Fuzz bots (aka CIFuzz). See
+	// https://google.github.io/oss-fuzz/getting-started/continuous-integration/ for more.
+	if b.role("Fuzz") {
+		b.cifuzz()
 		return
 	}
 

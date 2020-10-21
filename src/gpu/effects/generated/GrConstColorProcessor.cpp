@@ -29,9 +29,9 @@ public:
         colorVar = args.fUniformHandler->addUniform(&_outer, kFragment_GrShaderFlag,
                                                     kHalf4_GrSLType, "color");
         fragBuilder->codeAppendf(
-                R"SkSL(%s = %s;
+                R"SkSL(return %s;
 )SkSL",
-                args.fOutputColor, args.fUniformHandler->getUniformCStr(colorVar));
+                args.fUniformHandler->getUniformCStr(colorVar));
     }
 
 private:
@@ -60,6 +60,7 @@ bool GrConstColorProcessor::onIsEqual(const GrFragmentProcessor& other) const {
     if (color != that.color) return false;
     return true;
 }
+bool GrConstColorProcessor::usesExplicitReturn() const { return true; }
 GrConstColorProcessor::GrConstColorProcessor(const GrConstColorProcessor& src)
         : INHERITED(kGrConstColorProcessor_ClassID, src.optimizationFlags()), color(src.color) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -67,6 +68,11 @@ GrConstColorProcessor::GrConstColorProcessor(const GrConstColorProcessor& src)
 std::unique_ptr<GrFragmentProcessor> GrConstColorProcessor::clone() const {
     return std::make_unique<GrConstColorProcessor>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrConstColorProcessor::onDumpInfo() const {
+    return SkStringPrintf("(color=half4(%f, %f, %f, %f))", color.fR, color.fG, color.fB, color.fA);
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrConstColorProcessor);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrConstColorProcessor::TestCreate(GrProcessorTestData* d) {

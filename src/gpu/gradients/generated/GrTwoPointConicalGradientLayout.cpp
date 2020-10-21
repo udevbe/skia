@@ -109,7 +109,7 @@ half v = 1.0;
         }
         break;
 }
-%s = half4(half(t), v, 0.0, 0.0);
+return half4(half(t), v, 0.0, 0.0);
 )SkSL",
                 (int)_outer.type, args.fUniformHandler->getUniformCStr(focalParamsVar),
                 args.fSampleCoord, args.fSampleCoord, args.fSampleCoord,
@@ -125,8 +125,7 @@ half v = 1.0;
                 args.fSampleCoord, (_outer.isWellBehaved ? "true" : "false"),
                 (_outer.isRadiusIncreasing ? "true" : "false"),
                 (_outer.isNativelyFocal ? "true" : "false"),
-                (_outer.isNativelyFocal ? "true" : "false"), (_outer.isSwapped ? "true" : "false"),
-                args.fOutputColor);
+                (_outer.isNativelyFocal ? "true" : "false"), (_outer.isSwapped ? "true" : "false"));
     }
 
 private:
@@ -169,6 +168,7 @@ bool GrTwoPointConicalGradientLayout::onIsEqual(const GrFragmentProcessor& other
     if (focalParams != that.focalParams) return false;
     return true;
 }
+bool GrTwoPointConicalGradientLayout::usesExplicitReturn() const { return true; }
 GrTwoPointConicalGradientLayout::GrTwoPointConicalGradientLayout(
         const GrTwoPointConicalGradientLayout& src)
         : INHERITED(kGrTwoPointConicalGradientLayout_ClassID, src.optimizationFlags())
@@ -185,6 +185,17 @@ GrTwoPointConicalGradientLayout::GrTwoPointConicalGradientLayout(
 std::unique_ptr<GrFragmentProcessor> GrTwoPointConicalGradientLayout::clone() const {
     return std::make_unique<GrTwoPointConicalGradientLayout>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrTwoPointConicalGradientLayout::onDumpInfo() const {
+    return SkStringPrintf(
+            "(type=%d, isRadiusIncreasing=%s, isFocalOnCircle=%s, isWellBehaved=%s, isSwapped=%s, "
+            "isNativelyFocal=%s, focalParams=half2(%f, %f))",
+            (int)type, (isRadiusIncreasing ? "true" : "false"),
+            (isFocalOnCircle ? "true" : "false"), (isWellBehaved ? "true" : "false"),
+            (isSwapped ? "true" : "false"), (isNativelyFocal ? "true" : "false"), focalParams.fX,
+            focalParams.fY);
+}
+#endif
 GR_DEFINE_FRAGMENT_PROCESSOR_TEST(GrTwoPointConicalGradientLayout);
 #if GR_TEST_UTILS
 std::unique_ptr<GrFragmentProcessor> GrTwoPointConicalGradientLayout::TestCreate(

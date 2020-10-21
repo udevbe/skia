@@ -37,8 +37,6 @@ public:
 
     SurfaceReadPixelsSupport surfaceSupportsReadPixels(const GrSurface*) const override;
 
-    size_t bytesPerPixel(const GrBackendFormat&) const override;
-
     int getRenderTargetSampleCount(int requestedCount,
                                    const GrBackendFormat&) const override;
 
@@ -74,7 +72,7 @@ private:
 
     GrSwizzle onGetReadSwizzle(const GrBackendFormat&, GrColorType) const override;
 
-    typedef GrCaps INHERITED;
+    using INHERITED = GrCaps;
 };
 
 #endif

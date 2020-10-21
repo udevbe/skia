@@ -9,6 +9,7 @@
 #define SkPathRef_DEFINED
 
 #include "include/core/SkMatrix.h"
+#include "include/core/SkPathTypes.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkRect.h"
@@ -23,8 +24,21 @@
 #include <limits>
 #include <tuple>
 
+struct SkPathView;
 class SkRBuffer;
 class SkWBuffer;
+
+enum class SkPathConvexity {
+    kConvex,
+    kConcave,
+    kUnknown,
+};
+
+enum class SkPathFirstDirection {
+    kCW,         // == SkPathDirection::kCW
+    kCCW,        // == SkPathDirection::kCCW
+    kUnknown,
+};
 
 /**
  * Holds the path verbs and points. It is versioned by a generation ID. None of its public methods
@@ -58,6 +72,8 @@ public:
         fRRectOrOvalIsCCW = false;
         fRRectOrOvalStartIdx = 0xAC;
         SkDEBUGCODE(fEditorsAttached.store(0);)
+
+        this->computeBounds();  // do this now, before we worry about multiple owners/threads
         SkDEBUGCODE(this->validate();)
     }
 
@@ -278,6 +294,8 @@ public:
     int countVerbs() const { return fVerbs.count(); }
     int countWeights() const { return fConicWeights.count(); }
 
+    size_t approximateBytesUsed() const;
+
     /**
      * Returns a pointer one beyond the first logical verb (last verb in memory order).
      */
@@ -333,6 +351,8 @@ public:
 
     bool isValid() const;
     SkDEBUGCODE(void validate() const { SkASSERT(this->isValid()); } )
+
+    SkPathView view(SkPathFillType, SkPathConvexity) const;
 
 private:
     enum SerializationOffsets {

@@ -29,7 +29,7 @@ public:
                 R"SkSL(half4 inputColor = %s;
 half3 hsl = inputColor.xyz;
 half C = (1.0 - abs(2.0 * hsl.z - 1.0)) * hsl.y;
-half3 p = hsl.xxx + half3(0.0, 0.66666666666666663, 0.33333333333333331);
+half3 p = hsl.xxx + half3(0.0, 0.66666668653488159, 0.3333333432674408);
 half3 q = clamp(abs(fract(p) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
 half3 rgb = (q - 0.5) * C + hsl.z;
 %s = clamp(half4(rgb, inputColor.w), 0.0, 1.0);
@@ -52,6 +52,7 @@ bool GrHSLToRGBFilterEffect::onIsEqual(const GrFragmentProcessor& other) const {
     (void)that;
     return true;
 }
+bool GrHSLToRGBFilterEffect::usesExplicitReturn() const { return false; }
 GrHSLToRGBFilterEffect::GrHSLToRGBFilterEffect(const GrHSLToRGBFilterEffect& src)
         : INHERITED(kGrHSLToRGBFilterEffect_ClassID, src.optimizationFlags()) {
     this->cloneAndRegisterAllChildProcessors(src);
@@ -59,3 +60,6 @@ GrHSLToRGBFilterEffect::GrHSLToRGBFilterEffect(const GrHSLToRGBFilterEffect& src
 std::unique_ptr<GrFragmentProcessor> GrHSLToRGBFilterEffect::clone() const {
     return std::make_unique<GrHSLToRGBFilterEffect>(*this);
 }
+#if GR_TEST_UTILS
+SkString GrHSLToRGBFilterEffect::onDumpInfo() const { return SkString(); }
+#endif

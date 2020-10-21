@@ -355,7 +355,7 @@ static void find_culprit() {
         find_culprit();
 
     #if !defined(SK_BUILD_FOR_ANDROID)
-        void* stack[64];
+        void* stack[128];
         int count = backtrace(stack, SK_ARRAY_COUNT(stack));
         char** symbols = backtrace_symbols(stack, count);
         info("\nStack trace:\n");
@@ -683,7 +683,7 @@ static void push_codec_srcs(Path path) {
         return;
     }
     std::unique_ptr<SkCodec> codec = SkCodec::MakeFromData(encoded);
-    if (nullptr == codec.get()) {
+    if (nullptr == codec) {
         info("Couldn't create codec for %s.", path.c_str());
         return;
     }
@@ -838,7 +838,7 @@ static void push_codec_srcs(Path path) {
         {
             push_image_gen_src(path, ImageGenSrc::kPlatform_Mode, alphaType, false);
         }
-#elif defined(SK_ENABLE_NDK_DECODING)
+#elif defined(SK_ENABLE_NDK_IMAGES)
         push_image_gen_src(path, ImageGenSrc::kPlatform_Mode, alphaType, false);
 #endif
     }
@@ -1174,7 +1174,7 @@ struct Task {
                         data->rewind();
                     } else {
                         hashAndEncode = std::make_unique<HashAndEncode>(bitmap);
-                        hashAndEncode->write(&hash);
+                        hashAndEncode->feedHash(&hash);
                     }
                     SkMD5::Digest digest = hash.finish();
                     for (int i = 0; i < 16; i++) {
@@ -1231,7 +1231,7 @@ struct Task {
                             rasterized.getPixels(), w,h,8, rasterized.rowBytes(), cs.get(), info)};
                         CGContextDrawPDFPage(ctx.get(), page);
 
-                        // Skip calling hashAndEncode->write(SkMD5*)... we want the .pdf's hash.
+                        // Skip calling hashAndEncode->feedHash(SkMD5*)... we want the .pdf's hash.
                         hashAndEncode = std::make_unique<HashAndEncode>(rasterized);
                         WriteToDisk(task, md5, "png", nullptr,0, &rasterized, hashAndEncode.get());
                     } else
@@ -1382,7 +1382,7 @@ struct Task {
             sk_mkdir(path.c_str());
             path = SkOSPath::Join(path.c_str(), task.src.tag.c_str());
             sk_mkdir(path.c_str());
-            if (strcmp(task.src.options.c_str(), "") != 0) {
+            if (0 != strcmp(task.src.options.c_str(), "")) {
               path = SkOSPath::Join(path.c_str(), task.src.options.c_str());
               sk_mkdir(path.c_str());
             }
@@ -1391,21 +1391,21 @@ struct Task {
             path.append(ext);
         }
 
+        SkFILEWStream file(path.c_str());
+        if (!file.isValid()) {
+            fail(SkStringPrintf("Can't open %s for writing.\n", path.c_str()));
+            return;
+        }
         if (bitmap) {
             SkASSERT(hashAndEncode);
-            if (!hashAndEncode->writePngTo(path.c_str(),
-                                           result.md5.c_str(),
-                                           FLAGS_key,
-                                           FLAGS_properties)) {
+            if (!hashAndEncode->encodePNG(&file,
+                                          result.md5.c_str(),
+                                          FLAGS_key,
+                                          FLAGS_properties)) {
                 fail(SkStringPrintf("Can't encode PNG to %s.\n", path.c_str()));
                 return;
             }
         } else {
-            SkFILEWStream file(path.c_str());
-            if (!file.isValid()) {
-                fail(SkStringPrintf("Can't open %s for writing.\n", path.c_str()));
-                return;
-            }
             if (!file.writeStream(data, len)) {
                 fail(SkStringPrintf("Can't write to %s.\n", path.c_str()));
                 return;

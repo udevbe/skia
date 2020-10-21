@@ -413,7 +413,7 @@ const size_t gSimpleSizes[] = {
 };
 static_assert(SK_ARRAY_COUNT(gSimpleSizes) == SK_ARRAY_COUNT(gSimplePoints), "array_mismatch");
 
-}
+}  // namespace PolygonOffsetData
 
 namespace skiagm {
 
@@ -616,11 +616,11 @@ private:
 
     bool fConvexOnly;
 
-    typedef GM INHERITED;
+    using INHERITED = GM;
 };
 
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_GM(return new PolygonOffsetGM(true);)
 DEF_GM(return new PolygonOffsetGM(false);)
-}
+}  // namespace skiagm

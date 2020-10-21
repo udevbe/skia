@@ -10,6 +10,7 @@
 
 #include "include/core/SkPaint.h"
 #include "include/private/SkTArray.h"
+#include "include/private/SkTPin.h"
 #include "tools/sk_app/Window.h"
 
 #include "imgui.h"
@@ -110,7 +111,7 @@ struct DragCanvas {
     bool fDragging;
 };
 
-}
+}  // namespace ImGui
 
 class ImGuiLayer : public sk_app::Window::Layer {
 public:
